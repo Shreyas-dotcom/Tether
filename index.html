@@ -150,6 +150,16 @@ label.fld{display:block;font-size:.8rem;font-weight:600;color:var(--soft);margin
 .thumb{width:100%;border-radius:14px;margin-top:8px;display:none}
 .config-warn{background:#FBE7DF;color:var(--coral-d);padding:14px 16px;border-radius:14px;font-size:.85rem;margin:14px 20px;font-weight:500}
 .seen{font-size:.7rem;color:var(--soft)}
+.qprog{height:6px;background:var(--line);border-radius:99px;overflow:hidden;margin:4px 0 12px}
+.qprog>i{display:block;height:100%;background:var(--coral);transition:width .35s cubic-bezier(.2,.8,.2,1)}
+.qnum{font-size:.76rem;font-weight:700;color:var(--soft);text-transform:uppercase;letter-spacing:.05em}
+.resrow{display:flex;align-items:center;gap:10px;padding:11px 0;border-bottom:1px solid var(--line)}
+.resrow .rp{font-size:.84rem;font-weight:600;flex:1;min-width:0}
+.resrow .ra{display:flex;gap:6px;flex:none;flex-wrap:wrap;justify-content:flex-end;max-width:50%}
+.chip{font-size:.7rem;font-weight:700;color:#fff;padding:4px 9px;border-radius:99px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mdot{width:22px;height:22px;border-radius:50%;display:grid;place-items:center;font-size:.8rem;font-weight:700;flex:none}
+.deepans{padding:15px 16px;border-radius:16px;color:#fff;margin-top:10px;line-height:1.45;white-space:pre-wrap;word-break:break-word}
+.deepans .who{font-size:.72rem;font-weight:700;opacity:.85;text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px}
 </style>
 </head>
 <body>
@@ -262,38 +272,26 @@ label.fld{display:block;font-size:.8rem;font-weight:600;color:var(--soft);margin
   <section class="view" id="v-quizzes">
     <div class="pad">
       <h1 style="font-size:2rem;margin-bottom:4px">Quizzes</h1>
-      <p class="muted" style="margin-top:0">Answer on your own — your picks unlock once you've both replied.</p>
+      <p class="muted" style="margin-top:0">Pick a theme, answer a set of 10 on your own, then see how you lined up.</p>
       <div class="catgrid" id="cat-grid"></div>
     </div>
   </section>
 
-  <!-- QUIZ LIST -->
+  <!-- PACK / PROMPT LIST -->
   <section class="view" id="v-qlist">
     <div class="pad">
       <p><span class="link" id="ql-back">← Quizzes</span></p>
       <h1 id="ql-title" style="font-size:1.9rem"></h1>
+      <p class="muted" id="ql-sub" style="margin-top:2px"></p>
       <div id="ql-items" style="margin-top:8px"></div>
     </div>
   </section>
 
-  <!-- SINGLE QUIZ -->
+  <!-- PLAYER (set questions / reveals / deep text) -->
   <section class="view" id="v-quiz">
     <div class="pad">
       <p><span class="link" id="q-back">← Back</span></p>
-      <div class="card qcard">
-        <div class="muted" id="q-cat" style="font-weight:600;text-transform:uppercase;letter-spacing:.05em;font-size:.74rem"></div>
-        <div class="qprompt" id="q-prompt"></div>
-        <div id="q-options"></div>
-        <div id="q-waiting" style="display:none">
-          <div class="waiting">
-            <div class="spin"></div>
-            <div style="font-weight:600">You're in! 💛</div>
-            <div class="muted" id="q-waitname">Waiting for your partner…</div>
-            <button class="btn ghost tiny" id="q-refresh" style="margin-top:16px">Check now</button>
-          </div>
-        </div>
-        <div id="q-reveal" style="display:none"></div>
-      </div>
+      <div class="card qcard" id="q-card"></div>
     </div>
   </section>
 
@@ -518,7 +516,7 @@ async function renderHome(){
   const byQ={};
   (ans||[]).forEach(a=>{ (byQ[a.quiz_id]=byQ[a.quiz_id]||{})[a.user_id]=a.choice; });
   let both=0,match=0,mine=0;
-  Object.values(byQ).forEach(o=>{ const k=Object.keys(o); if(o[state.user.id]!==undefined)mine++; if(k.length===2){both++; if(o[k[0]]===o[k[1]])match++;} });
+  Object.entries(byQ).forEach(([qid,o])=>{ if(o[state.user.id]!==undefined)mine++; if(qid.indexOf("deep-")===0)return; const k=Object.keys(o); if(k.length===2){both++; if(o[k[0]]===o[k[1]])match++;} });
   $("home-answered").textContent=mine;
   $("home-matchrate").textContent= both? Math.round(match/both*100)+"%":"—";
 }
@@ -549,7 +547,7 @@ function dateModal(field,title,sub,current,onSave){
 }
 
 /* ============================================================
-   5. QUIZ ENGINE
+   5. QUIZ ENGINE  (themed packs of 10 + text-answer deep Qs)
    ============================================================ */
 const CATS=[
   {id:"wyr", title:"Would You Rather", emoji:"🤔", bg:"linear-gradient(135deg,#E2674C,#C9503A)"},
@@ -558,101 +556,167 @@ const CATS=[
   {id:"tot", title:"This or That", emoji:"⚖️", bg:"linear-gradient(135deg,#5E8D7E,#436b5e)"},
   {id:"deep",title:"Deeper Questions", emoji:"💭", bg:"linear-gradient(135deg,#6A6BA8,#4c4d86)"},
 ];
-const QUIZZES = buildQuizzes();
-function renderCats(){
-  $("cat-grid").innerHTML = CATS.map(c=>{
-    const n=QUIZZES.filter(q=>q.cat===c.id).length;
-    return `<div class="cat" style="background:${c.bg}" data-cat="${c.id}">
-      <div class="emoji">${c.emoji}</div>
-      <div><div class="title">${c.title}</div><div class="meta">${n} prompts</div></div></div>`;
-  }).join("");
-  document.querySelectorAll(".cat").forEach(el=> el.onclick=()=> openList(el.dataset.cat));
-}
-async function openList(catId){
-  const cat=CATS.find(c=>c.id===catId);
-  $("ql-title").textContent=cat.title;
-  showApp("qlist");
-  const items=QUIZZES.filter(q=>q.cat===catId);
-  const {data:ans}=await sb.from("quiz_answers").select("quiz_id,user_id").eq("couple_id",state.couple.id);
-  const mine=new Set((ans||[]).filter(a=>a.user_id===state.user.id).map(a=>a.quiz_id));
-  const done=new Set(); const cnt={};
-  (ans||[]).forEach(a=>{cnt[a.quiz_id]=(cnt[a.quiz_id]||0)+1; if(cnt[a.quiz_id]===2)done.add(a.quiz_id);});
-  $("ql-items").innerHTML=items.map(q=>{
-    const status = done.has(q.id)?`<span style="color:#3E7A36;font-weight:600">revealed ✓</span>`
-      : mine.has(q.id)?`<span class="muted">waiting…</span>`:`<span class="muted">tap to play</span>`;
-    return `<div class="card pad" style="margin:10px 0;display:flex;justify-content:space-between;align-items:center;gap:12px;cursor:pointer" data-q="${q.id}">
-      <div style="font-weight:600">${q.prompt}</div><div style="font-size:.78rem;white-space:nowrap">${status}</div></div>`;
-  }).join("");
-  document.querySelectorAll("[data-q]").forEach(el=> el.onclick=()=> openQuiz(el.dataset.q));
-}
-$("ql-back").onclick=()=>{ showApp("quizzes"); renderCats(); };
-$("q-back").onclick=()=>{ stopPoll(); openList(state.cur.cat); };
+const QUIZZES=buildQuizzes();
+const PACK_SIZE=10;
+const PACKS={};
+CATS.forEach(c=>{ if(c.id==="deep")return; const items=QUIZZES.filter(q=>q.cat===c.id); const p=[]; for(let i=0;i<items.length;i+=PACK_SIZE)p.push(items.slice(i,i+PACK_SIZE)); PACKS[c.id]=p; });
 
-async function openQuiz(qid){
+function renderCats(){
+  $("cat-grid").innerHTML=CATS.map(c=>{
+    const total=QUIZZES.filter(q=>q.cat===c.id).length;
+    const meta = c.id==="deep" ? total+" written questions" : PACKS[c.id].length+" sets · "+total+" prompts";
+    return `<div class="cat" style="background:${c.bg}" data-cat="${c.id}"><div class="emoji">${c.emoji}</div><div><div class="title">${c.title}</div><div class="meta">${meta}</div></div></div>`;
+  }).join("");
+  document.querySelectorAll(".cat").forEach(el=>el.onclick=()=>openCategory(el.dataset.cat));
+}
+$("ql-back").onclick=()=>{ stopPoll(); showApp("quizzes"); renderCats(); };
+
+async function openCategory(catId){
+  stopPoll();
+  $("ql-title").textContent=CATS.find(c=>c.id===catId).title;
+  showApp("qlist");
+  const {data:ans}=await sb.from("quiz_answers").select("quiz_id,user_id").eq("couple_id",state.couple.id);
+  const mine=new Set(), partner=new Set();
+  (ans||[]).forEach(a=>{ if(a.user_id===state.user.id)mine.add(a.quiz_id); else partner.add(a.quiz_id); });
+
+  if(catId==="deep"){
+    $("ql-sub").textContent="Write your own answer, then read each other's.";
+    const items=QUIZZES.filter(q=>q.cat==="deep");
+    $("ql-items").innerHTML=items.map(q=>{
+      const status=(mine.has(q.id)&&partner.has(q.id))?`<span style="color:#3E7A36;font-weight:600">shared ✓</span>`
+        :mine.has(q.id)?`<span class="muted">waiting…</span>`:`<span class="muted">your turn</span>`;
+      return `<div class="card pad" style="margin:10px 0;display:flex;justify-content:space-between;align-items:center;gap:12px;cursor:pointer" data-deep="${q.id}"><div style="font-weight:600">${q.prompt}</div><div style="font-size:.78rem;white-space:nowrap">${status}</div></div>`;
+    }).join("");
+    document.querySelectorAll("[data-deep]").forEach(el=>el.onclick=()=>openDeep(el.dataset.deep));
+    return;
+  }
+
+  $("ql-sub").textContent="Each set is 10 prompts — answer them, then see how you lined up.";
+  $("ql-items").innerHTML=PACKS[catId].map((items,idx)=>{
+    const ids=items.map(q=>q.id);
+    const myCnt=ids.filter(id=>mine.has(id)).length, paCnt=ids.filter(id=>partner.has(id)).length;
+    let status;
+    if(myCnt===ids.length&&paCnt===ids.length) status=`<span style="color:#3E7A36;font-weight:600">revealed ✓</span>`;
+    else if(myCnt===ids.length) status=`<span class="muted">waiting for ${state.partner.display_name}…</span>`;
+    else if(myCnt>0) status=`<span class="muted">${myCnt}/${ids.length} answered</span>`;
+    else status=`<span class="muted">tap to start</span>`;
+    return `<div class="card pad" style="margin:10px 0;display:flex;justify-content:space-between;align-items:center;gap:12px;cursor:pointer" data-pack="${idx}"><div><div style="font-weight:700">Set ${idx+1}</div><div class="muted" style="font-size:.8rem">${ids.length} prompts</div></div><div style="font-size:.78rem;white-space:nowrap">${status}</div></div>`;
+  }).join("");
+  document.querySelectorAll("[data-pack]").forEach(el=>el.onclick=()=>openPack(catId,parseInt(el.dataset.pack)));
+}
+
+/* ---- set player ---- */
+async function openPack(catId,idx){
+  const items=PACKS[catId][idx];
+  state.pack={catId,idx,items,pos:0,answers:{}};
+  showApp("quiz");
+  $("q-back").onclick=()=>{ stopPoll(); openCategory(catId); };
+  const ids=items.map(q=>q.id);
+  const {data}=await sb.from("quiz_answers").select("quiz_id,choice").eq("couple_id",state.couple.id).eq("user_id",state.user.id).in("quiz_id",ids);
+  (data||[]).forEach(a=>state.pack.answers[a.quiz_id]=a.choice);
+  const first=items.findIndex(q=>state.pack.answers[q.id]===undefined);
+  if(first===-1){ checkPackReveal(); return; }
+  state.pack.pos=first; renderPackQuestion();
+}
+function packOptions(q){
+  if(q.cat==="who") return [{label:nameFor(state.partner.id)+" 💜",val:state.partner.id},{label:nameFor(state.user.id)+" 💛",val:state.user.id}];
+  return q.options.map((o,i)=>({label:o,val:String(i)}));
+}
+function renderPackQuestion(){
+  const p=state.pack, q=p.items[p.pos], opts=packOptions(q);
+  $("q-card").innerHTML=`
+    <div class="qnum">Set ${p.idx+1} · ${CATS.find(c=>c.id===p.catId).title}</div>
+    <div class="qprog"><i style="width:${Math.round(p.pos/p.items.length*100)}%"></i></div>
+    <div class="muted" style="font-size:.8rem;margin-bottom:6px">Question ${p.pos+1} of ${p.items.length}</div>
+    <div class="qprompt">${q.prompt}</div>
+    <div id="q-options">${opts.map((o,i)=>`<button class="opt" data-val="${o.val}"><span class="k">${q.cat==="who"?(i+1):String.fromCharCode(65+i)}</span>${o.label}</button>`).join("")}</div>`;
+  document.querySelectorAll("#q-options .opt").forEach(b=>b.onclick=()=>pickAnswer(q,b.dataset.val));
+}
+function pickAnswer(q,val){
+  const p=state.pack; p.answers[q.id]=val;
+  sb.from("quiz_answers").upsert({couple_id:state.couple.id,quiz_id:q.id,user_id:state.user.id,choice:val},{onConflict:"couple_id,quiz_id,user_id"}).then(()=>{});
+  if(p.pos<p.items.length-1){ p.pos++; renderPackQuestion(); } else checkPackReveal();
+}
+async function checkPackReveal(){
+  const p=state.pack, ids=p.items.map(q=>q.id);
+  $("q-card").innerHTML=`<div class="waiting"><div class="spin"></div><div class="muted">Loading…</div></div>`;
+  const {data}=await sb.from("quiz_answers").select("quiz_id,user_id,choice").eq("couple_id",state.couple.id).in("quiz_id",ids);
+  const byQ={}; (data||[]).forEach(a=>{(byQ[a.quiz_id]=byQ[a.quiz_id]||{})[a.user_id]=a.choice;});
+  const partnerDone=ids.every(id=>byQ[id]&&byQ[id][state.partner.id]!==undefined);
+  if(partnerDone){ stopPoll(); renderPackResults(byQ); } else renderPackWaiting();
+}
+function renderPackWaiting(){
+  $("q-card").innerHTML=`<div class="waiting"><div class="spin"></div><div style="font-weight:600">You finished this set! 💛</div><div class="muted">Waiting for ${state.partner.display_name} to finish…</div><button class="btn ghost tiny" id="q-refresh" style="margin-top:16px">Check now</button></div>`;
+  $("q-refresh").onclick=()=>checkPackReveal();
+  stopPoll(); state.pollTimer=setInterval(()=>checkPackReveal(),4500);
+}
+function renderPackResults(byQ){
+  const p=state.pack; let m=0;
+  const rows=p.items.map((q,i)=>{
+    const mine=byQ[q.id][state.user.id], theirs=byQ[q.id][state.partner.id], match=mine===theirs; if(match)m++;
+    return `<div class="resrow" style="animation:pop .4s ${(i*0.04).toFixed(2)}s both">
+      <div class="mdot" style="background:${match?'#E7F2E4':'#FBE7DF'};color:${match?'#3E7A36':'var(--coral-d)'}">${match?'✓':'·'}</div>
+      <div class="rp">${q.prompt}</div>
+      <div class="ra"><span class="chip" style="background:${colorFor(state.user.id)}">${labelOf(q,mine)}</span><span class="chip" style="background:${colorFor(state.partner.id)}">${labelOf(q,theirs)}</span></div></div>`;
+  }).join("");
+  $("q-card").innerHTML=`
+    <div class="center"><span class="badge match">You synced on ${m} of ${p.items.length} 💞</span></div>
+    <div class="qnum" style="margin:14px 0 6px">${state.profile.display_name} <span style="color:${colorFor(state.user.id)}">●</span>&nbsp;&nbsp;${state.partner.display_name} <span style="color:${colorFor(state.partner.id)}">●</span></div>
+    ${rows}
+    <button class="btn ghost" style="margin-top:18px" id="rev-next">Back to sets</button>`;
+  $("rev-next").onclick=()=>openCategory(p.catId);
+}
+function labelOf(q,choice){ if(q.cat==="who")return nameFor(choice); return q.options[parseInt(choice)]; }
+
+/* ---- deeper questions (written) ---- */
+async function openDeep(qid){
+  stopPoll();
   const q=QUIZZES.find(x=>x.id===qid); state.cur=q;
   showApp("quiz");
-  $("q-cat").textContent=CATS.find(c=>c.id===q.cat).title;
-  $("q-prompt").textContent=q.prompt;
-  $("q-waiting").style.display="none"; $("q-reveal").style.display="none"; $("q-reveal").innerHTML="";
-  // build options
-  let opts=[];
-  if(q.cat==="who"){ opts=[{label:nameFor(state.partner.id)+" 💜",val:state.partner.id},{label:nameFor(state.user.id)+" 💛",val:state.user.id}]; }
-  else { opts=q.options.map((o,i)=>({label:o,val:String(i)})); }
-  // already answered?
-  const {data:existing}=await sb.from("quiz_answers").select("*").eq("couple_id",state.couple.id).eq("quiz_id",qid);
-  const myAns=(existing||[]).find(a=>a.user_id===state.user.id);
-  if(myAns){ afterAnswer(q,existing); return; }
-  $("q-options").style.display="block";
-  $("q-options").innerHTML=opts.map((o,i)=>`<button class="opt" data-val="${o.val}"><span class="k">${q.cat==="who"?(i+1):String.fromCharCode(65+i)}</span>${o.label}</button>`).join("");
-  document.querySelectorAll("#q-options .opt").forEach(b=> b.onclick=()=> submitAnswer(q,b.dataset.val));
+  $("q-back").onclick=()=>{ stopPoll(); openCategory("deep"); };
+  const {data}=await sb.from("quiz_answers").select("user_id,choice").eq("couple_id",state.couple.id).eq("quiz_id",qid);
+  const mine=(data||[]).find(a=>a.user_id===state.user.id), theirs=(data||[]).find(a=>a.user_id===state.partner.id);
+  if(mine&&theirs) renderDeepReveal(q,mine.choice,theirs.choice);
+  else if(mine) renderDeepWaiting(q);
+  else renderDeepAnswer(q);
 }
-async function submitAnswer(q,val){
-  await sb.from("quiz_answers").upsert({couple_id:state.couple.id,quiz_id:q.id,user_id:state.user.id,choice:val},{onConflict:"couple_id,quiz_id,user_id"});
-  const {data}=await sb.from("quiz_answers").select("*").eq("couple_id",state.couple.id).eq("quiz_id",q.id);
-  afterAnswer(q,data);
-}
-function afterAnswer(q,answers){
-  $("q-options").style.display="none";
-  if(answers.length===2){ stopPoll(); renderReveal(q,answers); }
-  else {
-    $("q-waiting").style.display="block";
-    $("q-waitname").textContent=`Waiting for ${state.partner.display_name}…`;
-    startPoll(q);
-  }
-}
-function startPoll(q){
-  stopPoll();
-  state.pollTimer=setInterval(async ()=>{
-    const {data}=await sb.from("quiz_answers").select("*").eq("couple_id",state.couple.id).eq("quiz_id",q.id);
-    if(data&&data.length===2){ stopPoll(); afterAnswer(q,data); }
-  },4000);
-}
-function stopPoll(){ clearInterval(state.pollTimer); }
-$("q-refresh").onclick=async ()=>{
-  const q=state.cur;
-  const {data}=await sb.from("quiz_answers").select("*").eq("couple_id",state.couple.id).eq("quiz_id",q.id);
-  if(data&&data.length===2) afterAnswer(q,data); else toast(`${state.partner.display_name} hasn't answered yet`);
-};
-function labelOf(q,choice){
-  if(q.cat==="who") return nameFor(choice);
-  return q.options[parseInt(choice)];
-}
-function renderReveal(q,answers){
-  const mine=answers.find(a=>a.user_id===state.user.id), theirs=answers.find(a=>a.user_id!==state.user.id);
-  const match=mine.choice===theirs.choice;
-  $("q-reveal").style.display="block";
-  $("q-reveal").innerHTML=`
-    <div class="center"><span class="badge ${match?"match":"diff"}">${match?"You matched! 💞":"Opposites 🌗"}</span></div>
-    <div class="reveal">
-      <div class="pick" style="background:${colorFor(state.user.id)}"><div class="who">${nameFor(state.user.id)}</div><div class="ans">${labelOf(q,mine.choice)}</div></div>
-      <div class="pick" style="background:${colorFor(theirs.user_id)}"><div class="who">${state.partner.display_name}</div><div class="ans">${labelOf(q,theirs.choice)}</div></div>
-    </div>
-    <button class="btn ghost" style="margin-top:18px" id="rev-next">Next prompt →</button>`;
-  $("rev-next").onclick=()=>{
-    const list=QUIZZES.filter(x=>x.cat===q.cat); const i=list.findIndex(x=>x.id===q.id);
-    if(i<list.length-1) openQuiz(list[i+1].id); else { toast("That's the last one here!"); openList(q.cat); }
+function renderDeepAnswer(q){
+  $("q-card").innerHTML=`
+    <div class="qnum">💭 Deeper Question</div>
+    <div class="qprompt" style="margin:6px 0 6px">${q.prompt}</div>
+    <textarea class="input" id="deep-text" rows="5" style="min-height:120px;resize:vertical" placeholder="Take your time…"></textarea>
+    <button class="btn" id="deep-send" style="margin-top:10px">Send to ${state.partner.display_name}</button>`;
+  $("deep-send").onclick=async ()=>{
+    const t=$("deep-text").value.trim(); if(!t)return toast("Write a little something first");
+    $("deep-send").disabled=true; $("deep-send").textContent="Sending…";
+    await sb.from("quiz_answers").upsert({couple_id:state.couple.id,quiz_id:q.id,user_id:state.user.id,choice:t},{onConflict:"couple_id,quiz_id,user_id"});
+    openDeep(q.id);
   };
 }
+function renderDeepWaiting(q){
+  $("q-card").innerHTML=`<div class="qnum">💭 Deeper Question</div><div class="qprompt" style="margin:6px 0 14px">${q.prompt}</div>
+    <div class="waiting"><div class="spin"></div><div style="font-weight:600">Sent 💛</div><div class="muted">Waiting for ${state.partner.display_name} to answer…</div><button class="btn ghost tiny" id="q-refresh" style="margin-top:16px">Check now</button></div>`;
+  $("q-refresh").onclick=()=>openDeep(q.id);
+  stopPoll(); state.pollTimer=setInterval(async ()=>{
+    const {data}=await sb.from("quiz_answers").select("user_id").eq("couple_id",state.couple.id).eq("quiz_id",q.id);
+    if((data||[]).length===2){ stopPoll(); openDeep(q.id); }
+  },4500);
+}
+function renderDeepReveal(q,mineTxt,theirsTxt){
+  stopPoll();
+  $("q-card").innerHTML=`
+    <div class="center"><span class="badge match">Two hearts, two takes 💭</span></div>
+    <div class="qprompt" style="margin:12px 0 6px;font-size:1.3rem">${q.prompt}</div>
+    <div class="deepans" style="background:${colorFor(state.user.id)}"><div class="who">${state.profile.display_name}</div>${escapeHtml(mineTxt)}</div>
+    <div class="deepans" style="background:${colorFor(state.partner.id)}"><div class="who">${state.partner.display_name}</div>${escapeHtml(theirsTxt)}</div>
+    <button class="btn ghost" style="margin-top:18px" id="rev-next">Next question →</button>`;
+  $("rev-next").onclick=()=>{
+    const list=QUIZZES.filter(x=>x.cat==="deep"); const i=list.findIndex(x=>x.id===q.id);
+    if(i<list.length-1)openDeep(list[i+1].id); else { toast("That's the last one!"); openCategory("deep"); }
+  };
+}
+function escapeHtml(s){ return (s||"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+function stopPoll(){ clearInterval(state.pollTimer); }
 
 /* ============================================================
    6. PHOTOS (Supabase Storage, private bucket + signed URLs)
