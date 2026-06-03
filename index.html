@@ -1,0 +1,955 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+<title>Tether · just us two</title>
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Tether" />
+<meta name="theme-color" content="#E2674C" />
+<link rel="apple-touch-icon" href="icon.png" />
+<link rel="icon" href="icon.png" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400..700;1,9..144,400..600&family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+<style>
+:root{
+  --cream:#FBF4EA; --paper:#FFFDF8; --ink:#2B2018; --soft:#7C6F63;
+  --coral:#E2674C; --coral-d:#C9503A; --berry:#9B4F70; --gold:#E6A93B;
+  --line:#EBDFCF; --shadow:0 18px 40px -22px rgba(74,45,25,.35);
+  --you:var(--coral); --them:var(--berry);
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0}
+body{
+  font-family:'Hanken Grotesk',system-ui,sans-serif;
+  color:var(--ink); background:var(--cream);
+  background-image:radial-gradient(120% 80% at 50% -10%,#FCEBDC 0%,rgba(252,235,220,0) 55%),
+                   radial-gradient(90% 60% at 100% 110%,#F3E0E8 0%,rgba(243,224,232,0) 50%);
+  background-attachment:fixed;
+  min-height:100vh; line-height:1.5; -webkit-font-smoothing:antialiased;
+  -webkit-text-size-adjust:100%; overscroll-behavior-y:none;
+}
+h1,h2,h3{font-family:'Fraunces',Georgia,serif;font-weight:600;letter-spacing:-.01em;margin:0}
+.app{max-width:480px;margin:0 auto;min-height:100vh;position:relative;padding-bottom:92px;padding-top:env(safe-area-inset-top)}
+.view{display:none;animation:rise .5s cubic-bezier(.2,.7,.2,1)}
+.view.active{display:block}
+@keyframes rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+.pad{padding:22px 20px}
+.muted{color:var(--soft)}
+.center{text-align:center}
+
+/* buttons + inputs */
+.btn{font:inherit;font-weight:600;border:0;border-radius:999px;padding:15px 22px;cursor:pointer;
+  background:linear-gradient(180deg,var(--coral),var(--coral-d));color:#fff;width:100%;
+  box-shadow:0 12px 24px -12px rgba(201,80,58,.7);transition:transform .15s,box-shadow .15s}
+.btn:active{transform:translateY(1px) scale(.99)}
+.btn.ghost{background:transparent;color:var(--coral-d);box-shadow:none;border:1.5px solid var(--line)}
+.btn.tiny{width:auto;padding:9px 16px;font-size:.85rem}
+.input{font:inherit;width:100%;padding:14px 16px;border:1.5px solid var(--line);border-radius:16px;
+  background:var(--paper);color:var(--ink);margin:6px 0;outline:none;transition:border .2s}
+.input:focus{border-color:var(--coral)}
+label.fld{display:block;font-size:.8rem;font-weight:600;color:var(--soft);margin-top:12px}
+.card{background:var(--paper);border:1px solid var(--line);border-radius:22px;box-shadow:var(--shadow)}
+.link{color:var(--coral-d);font-weight:600;cursor:pointer;text-decoration:none}
+
+/* auth / pairing */
+.hero{padding:54px 24px 10px;text-align:center}
+.mark{font-family:'Fraunces';font-size:2.7rem;font-weight:600;letter-spacing:-.02em}
+.mark .dot{color:var(--coral)}
+.sub{color:var(--soft);margin-top:6px;font-size:1.02rem}
+.codebox{font-family:'Fraunces';font-size:2.6rem;letter-spacing:.32em;font-weight:600;text-align:center;
+  padding:18px;background:var(--cream);border:2px dashed var(--coral);border-radius:18px;margin:14px 0;color:var(--coral-d)}
+.tabbar-hidden .tabbar{display:none}
+
+/* tab bar */
+.tabbar{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:480px;
+  display:flex;justify-content:space-around;background:rgba(255,253,248,.92);backdrop-filter:blur(12px);
+  border-top:1px solid var(--line);padding:9px 8px calc(9px + env(safe-area-inset-bottom));z-index:40}
+.tab{flex:1;border:0;background:none;display:flex;flex-direction:column;align-items:center;gap:3px;
+  color:var(--soft);font-size:.66rem;font-weight:600;cursor:pointer;padding:6px 0}
+.tab svg{width:23px;height:23px;stroke:currentColor;fill:none;stroke-width:1.8}
+.tab.on{color:var(--coral-d)}
+.tab.on svg{stroke:var(--coral-d)}
+
+/* home */
+.topbar{display:flex;align-items:center;justify-content:space-between;padding:20px 20px 6px}
+.avs{display:flex;align-items:center}
+.av{width:38px;height:38px;border-radius:50%;display:grid;place-items:center;color:#fff;font-weight:700;
+  font-family:'Fraunces';border:2.5px solid var(--paper);font-size:1rem}
+.av+.av{margin-left:-12px}
+.bigstat{font-family:'Fraunces';font-size:3.4rem;line-height:1;font-weight:600;color:var(--coral-d)}
+.row{display:flex;gap:12px}
+.row>*{flex:1}
+.statcard{padding:18px}
+.statcard .n{font-family:'Fraunces';font-size:1.9rem;font-weight:600}
+.statcard .l{font-size:.78rem;color:var(--soft);font-weight:600;text-transform:uppercase;letter-spacing:.04em}
+.section-h{font-family:'Fraunces';font-size:1.35rem;margin:26px 4px 12px}
+
+/* quiz */
+.catgrid{display:grid;grid-template-columns:1fr 1fr;gap:13px}
+.cat{padding:20px 16px;border-radius:20px;color:#fff;cursor:pointer;position:relative;overflow:hidden;
+  min-height:108px;display:flex;flex-direction:column;justify-content:flex-end;box-shadow:var(--shadow)}
+.cat .emoji{font-size:1.8rem;position:absolute;top:14px;left:16px}
+.cat .title{font-family:'Fraunces';font-size:1.18rem;font-weight:600}
+.cat .meta{font-size:.74rem;opacity:.85}
+.qcard{padding:26px 22px;margin-top:14px}
+.qprompt{font-family:'Fraunces';font-size:1.55rem;line-height:1.25;margin-bottom:6px}
+.opt{font:inherit;font-size:1.05rem;font-weight:600;width:100%;text-align:left;padding:17px 18px;margin:9px 0;
+  border:1.5px solid var(--line);border-radius:16px;background:var(--paper);cursor:pointer;transition:.15s;display:flex;gap:12px;align-items:center}
+.opt:active{transform:scale(.99)}
+.opt .k{width:26px;height:26px;border-radius:50%;border:1.5px solid var(--line);display:grid;place-items:center;font-size:.85rem;color:var(--soft);flex:none}
+.waiting{text-align:center;padding:30px 10px}
+.spin{width:34px;height:34px;border:3px solid var(--line);border-top-color:var(--coral);border-radius:50%;
+  margin:0 auto 14px;animation:sp 1s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+.reveal{display:flex;gap:12px;margin-top:16px}
+.pick{flex:1;padding:18px 14px;border-radius:18px;text-align:center;color:#fff;animation:pop .45s cubic-bezier(.2,1.4,.4,1) both}
+.pick:nth-child(2){animation-delay:.1s}
+@keyframes pop{from{opacity:0;transform:scale(.85)}to{opacity:1;transform:none}}
+.pick .who{font-size:.75rem;font-weight:700;opacity:.85;text-transform:uppercase;letter-spacing:.05em}
+.pick .ans{font-family:'Fraunces';font-size:1.15rem;font-weight:600;margin-top:5px}
+.badge{display:inline-block;font-weight:700;padding:8px 18px;border-radius:999px;margin:18px auto 4px;font-size:.95rem}
+.badge.match{background:#E7F2E4;color:#3E7A36}
+.badge.diff{background:#FBE7DF;color:var(--coral-d)}
+
+/* stories */
+.story{margin-top:16px;border-radius:22px;overflow:hidden}
+.story img{width:100%;display:block;background:var(--line)}
+.story .cap{padding:13px 16px;display:flex;justify-content:space-between;align-items:center;gap:10px}
+.story .cap .t{font-size:1.02rem}
+.story .cap .m{font-size:.72rem;color:var(--soft);white-space:nowrap}
+.fab{position:fixed;right:50%;transform:translateX(218px);bottom:104px;width:58px;height:58px;border-radius:50%;
+  background:linear-gradient(180deg,var(--coral),var(--coral-d));color:#fff;border:0;font-size:1.7rem;cursor:pointer;
+  box-shadow:0 16px 30px -12px rgba(201,80,58,.8);z-index:30}
+@media(max-width:520px){.fab{right:20px;transform:none}}
+
+/* map */
+#map{height:300px;border-radius:20px;border:1px solid var(--line);z-index:1}
+#mini-map{height:190px;border-radius:16px;border:1px solid var(--line);margin-top:8px;z-index:1}
+.mem{display:flex;gap:13px;padding:13px 0;border-bottom:1px solid var(--line);align-items:center}
+.mem img{width:62px;height:62px;border-radius:14px;object-fit:cover;flex:none;background:var(--line)}
+.mem .t{font-weight:600}
+.mem .s{font-size:.78rem;color:var(--soft)}
+
+/* modal + toast */
+.modal-bg{position:fixed;inset:0;background:rgba(43,32,24,.45);backdrop-filter:blur(3px);z-index:60;
+  display:none;align-items:flex-end;justify-content:center}
+.modal-bg.open{display:flex;animation:fade .25s}
+@keyframes fade{from{opacity:0}to{opacity:1}}
+.modal{background:var(--paper);width:100%;max-width:480px;border-radius:26px 26px 0 0;padding:24px 20px calc(24px + env(safe-area-inset-bottom));
+  max-height:92vh;overflow:auto;animation:up .3s cubic-bezier(.2,.8,.2,1)}
+@keyframes up{from{transform:translateY(40px)}to{transform:none}}
+.modal h2{font-size:1.5rem;margin-bottom:6px}
+.toast{position:fixed;bottom:110px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;
+  padding:12px 20px;border-radius:999px;font-size:.9rem;z-index:90;opacity:0;transition:opacity .3s;pointer-events:none;max-width:90%}
+.toast.show{opacity:1}
+.thumb{width:100%;border-radius:14px;margin-top:8px;display:none}
+.config-warn{background:#FBE7DF;color:var(--coral-d);padding:14px 16px;border-radius:14px;font-size:.85rem;margin:14px 20px;font-weight:500}
+.seen{font-size:.7rem;color:var(--soft)}
+</style>
+</head>
+<body>
+<div class="app" id="app">
+
+  <!-- AUTH -->
+  <section class="view active" id="v-auth">
+    <div class="hero">
+      <div class="mark">Tether<span class="dot">.</span></div>
+      <div class="sub">a tiny private space, just for the two of you</div>
+    </div>
+    <div id="config-warn-slot"></div>
+    <div class="pad">
+      <div class="card pad">
+        <div id="auth-name-wrap">
+          <label class="fld" for="au-name">Your name</label>
+          <input class="input" id="au-name" placeholder="e.g. Sharma" autocomplete="name" />
+        </div>
+        <label class="fld" for="au-email">Email</label>
+        <input class="input" id="au-email" type="email" placeholder="you@email.com" autocomplete="email" />
+        <label class="fld" for="au-pass">Password</label>
+        <input class="input" id="au-pass" type="password" placeholder="••••••••" autocomplete="current-password" />
+        <div style="height:14px"></div>
+        <button class="btn" id="au-submit">Create account</button>
+        <p class="center muted" style="margin:16px 0 0;font-size:.92rem">
+          <span id="au-switch-text">Already have an account?</span>
+          <span class="link" id="au-switch">Sign in</span>
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- PAIRING -->
+  <section class="view" id="v-pair">
+    <div class="hero">
+      <div class="mark">Tether<span class="dot">.</span></div>
+      <div class="sub">link up with your person</div>
+    </div>
+    <div class="pad">
+      <div class="card pad" id="pair-choose">
+        <h2>Start your room</h2>
+        <p class="muted" style="margin:6px 0 16px">Create a private room and share the code with your partner, or join with a code they sent you.</p>
+        <button class="btn" id="pc-create">Create a room</button>
+        <div style="height:10px"></div>
+        <button class="btn ghost" id="pc-join">I have a code</button>
+      </div>
+
+      <div class="card pad" id="pair-created" style="display:none">
+        <h2>Your room is open 💌</h2>
+        <p class="muted" style="margin:6px 0 0">Send this code to your partner. The room locks to just the two of you once they join.</p>
+        <div class="codebox" id="pc-code">······</div>
+        <button class="btn ghost tiny" id="pc-copy" style="width:100%">Copy code</button>
+        <p class="center muted" style="margin-top:16px;font-size:.9rem">Waiting for your partner to join…</p>
+        <div class="spin"></div>
+      </div>
+
+      <div class="card pad" id="pair-join" style="display:none">
+        <h2>Enter your code</h2>
+        <p class="muted" style="margin:6px 0 10px">Type the 6-character code your partner shared.</p>
+        <input class="input" id="pj-code" placeholder="ABC123" maxlength="6" style="text-transform:uppercase;letter-spacing:.2em;text-align:center;font-size:1.3rem" />
+        <div style="height:10px"></div>
+        <button class="btn" id="pj-submit">Join room</button>
+        <p class="center" style="margin-top:14px"><span class="link" id="pj-back">Back</span></p>
+      </div>
+
+      <p class="center" style="margin-top:18px"><span class="link" id="pair-signout">Sign out</span></p>
+    </div>
+  </section>
+
+  <!-- HOME -->
+  <section class="view" id="v-home">
+    <div class="topbar">
+      <div class="avs" id="home-avs"></div>
+      <button class="btn ghost tiny" id="home-signout">Sign out</button>
+    </div>
+    <div class="pad" style="padding-top:6px">
+      <div class="card pad center" id="home-together">
+        <div class="muted" style="font-weight:600;text-transform:uppercase;letter-spacing:.05em;font-size:.76rem">Together for</div>
+        <div class="bigstat" id="home-days">—</div>
+        <div class="muted" id="home-since" style="font-size:.86rem"></div>
+        <button class="btn ghost tiny" id="home-set-anniv" style="margin-top:12px">Set your anniversary</button>
+      </div>
+
+      <div class="row" style="margin-top:13px">
+        <div class="card statcard center">
+          <div class="n" id="home-matchrate">—</div>
+          <div class="l">Quiz sync</div>
+        </div>
+        <div class="card statcard center">
+          <div class="n" id="home-answered">0</div>
+          <div class="l">Answered</div>
+        </div>
+      </div>
+
+      <div class="card pad" id="home-countdown" style="margin-top:13px">
+        <div class="l" style="color:var(--soft);font-weight:600;text-transform:uppercase;letter-spacing:.04em;font-size:.76rem">Counting down to</div>
+        <div id="home-cd-body" style="margin-top:6px"></div>
+        <button class="btn ghost tiny" id="home-set-cd" style="margin-top:12px">Set a countdown</button>
+      </div>
+
+      <h3 class="section-h">Jump in</h3>
+      <div class="row">
+        <button class="btn" data-go="quizzes">Play a quiz</button>
+        <button class="btn ghost" data-go="map">Add a memory</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- QUIZZES -->
+  <section class="view" id="v-quizzes">
+    <div class="pad">
+      <h1 style="font-size:2rem;margin-bottom:4px">Quizzes</h1>
+      <p class="muted" style="margin-top:0">Answer on your own — your picks unlock once you've both replied.</p>
+      <div class="catgrid" id="cat-grid"></div>
+    </div>
+  </section>
+
+  <!-- QUIZ LIST -->
+  <section class="view" id="v-qlist">
+    <div class="pad">
+      <p><span class="link" id="ql-back">← Quizzes</span></p>
+      <h1 id="ql-title" style="font-size:1.9rem"></h1>
+      <div id="ql-items" style="margin-top:8px"></div>
+    </div>
+  </section>
+
+  <!-- SINGLE QUIZ -->
+  <section class="view" id="v-quiz">
+    <div class="pad">
+      <p><span class="link" id="q-back">← Back</span></p>
+      <div class="card qcard">
+        <div class="muted" id="q-cat" style="font-weight:600;text-transform:uppercase;letter-spacing:.05em;font-size:.74rem"></div>
+        <div class="qprompt" id="q-prompt"></div>
+        <div id="q-options"></div>
+        <div id="q-waiting" style="display:none">
+          <div class="waiting">
+            <div class="spin"></div>
+            <div style="font-weight:600">You're in! 💛</div>
+            <div class="muted" id="q-waitname">Waiting for your partner…</div>
+            <button class="btn ghost tiny" id="q-refresh" style="margin-top:16px">Check now</button>
+          </div>
+        </div>
+        <div id="q-reveal" style="display:none"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- STORIES -->
+  <section class="view" id="v-stories">
+    <div class="pad">
+      <h1 style="font-size:2rem;margin-bottom:4px">Moments</h1>
+      <p class="muted" style="margin-top:0">A quick peek at what you're up to, just for them.</p>
+      <div id="stories-feed"></div>
+    </div>
+    <button class="fab" id="story-fab" title="Share a moment">＋</button>
+  </section>
+
+  <!-- MAP -->
+  <section class="view" id="v-map">
+    <div class="pad">
+      <h1 style="font-size:2rem;margin-bottom:4px">Our map</h1>
+      <p class="muted" style="margin-top:0">Every place that's part of your story.</p>
+      <div id="map"></div>
+      <h3 class="section-h">Timeline</h3>
+      <div id="mem-list"></div>
+    </div>
+    <button class="fab" id="mem-fab" title="Add a memory">＋</button>
+  </section>
+
+  <!-- TAB BAR -->
+  <nav class="tabbar" id="tabbar" style="display:none">
+    <button class="tab on" data-tab="home"><svg viewBox="0 0 24 24"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/></svg>Home</button>
+    <button class="tab" data-tab="quizzes"><svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><path d="M9 10h.01M12 10h.01M15 10h.01"/></svg>Quizzes</button>
+    <button class="tab" data-tab="stories"><svg viewBox="0 0 24 24"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>Moments</button>
+    <button class="tab" data-tab="map"><svg viewBox="0 0 24 24"><path d="M21 10c0 7-9 12-9 12s-9-5-9-12a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>Map</button>
+  </nav>
+</div>
+
+<!-- MODAL -->
+<div class="modal-bg" id="modal-bg"><div class="modal" id="modal"></div></div>
+<div class="toast" id="toast"></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+/* ============================================================
+   1. CONFIG  —  paste your two Supabase values here
+   ============================================================ */
+const SUPABASE_URL  = "https://iaijyuhhasgeehonkkxa.supabase.co";          // your project URL
+const SUPABASE_ANON = "sb_publishable_U682uX1rSxZ1_DJaHywIsg_7HTOm_ZZ";   // public key — safe in client code
+
+/* ============================================================ */
+
+const configured = !SUPABASE_URL.includes("PASTE") && !SUPABASE_ANON.includes("PASTE");
+let sb = null;
+if (configured) sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+
+const $ = id => document.getElementById(id);
+const state = { user:null, profile:null, couple:null, partner:null, mode:"signup", cur:null, pollTimer:null };
+
+/* ---------- helpers ---------- */
+function show(view){
+  document.querySelectorAll(".view").forEach(v=>v.classList.remove("active"));
+  $("v-"+view).classList.add("active");
+  window.scrollTo(0,0);
+}
+const appViews = ["home","quizzes","qlist","quiz","stories","map"];
+function showApp(view){
+  show(view);
+  $("tabbar").style.display = appViews.includes(view) ? "flex" : "none";
+  const tabFor = (view==="qlist"||view==="quiz") ? "quizzes" : view;
+  document.querySelectorAll(".tab").forEach(t=>t.classList.toggle("on", t.dataset.tab===tabFor));
+}
+function toast(msg){ const t=$("toast"); t.textContent=msg; t.classList.add("show"); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove("show"),2600); }
+function openModal(html){ $("modal").innerHTML=html; $("modal-bg").classList.add("open"); }
+function closeModal(){ $("modal-bg").classList.remove("open"); }
+$("modal-bg").addEventListener("click",e=>{ if(e.target===$("modal-bg")) closeModal(); });
+function initials(name){ return (name||"?").trim().slice(0,1).toUpperCase(); }
+function colorFor(uid){ if(!state.couple) return "var(--coral)"; return uid===state.couple.member_a ? "var(--coral)" : "var(--berry)"; }
+function nameFor(uid){ if(uid===state.user.id) return state.profile?.display_name||"You"; return state.partner?.display_name||"Partner"; }
+function genCode(){ const c="ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; let s=""; for(let i=0;i<6;i++) s+=c[Math.floor(Math.random()*c.length)]; return s; }
+
+/* ============================================================
+   2. AUTH
+   ============================================================ */
+function setMode(m){
+  state.mode=m;
+  $("au-name-wrap")? null:null;
+  $("auth-name-wrap").style.display = m==="signup" ? "block":"none";
+  $("au-submit").textContent = m==="signup" ? "Create account":"Sign in";
+  $("au-switch-text").textContent = m==="signup" ? "Already have an account?":"New here?";
+  $("au-switch").textContent = m==="signup" ? "Sign in":"Create one";
+}
+$("au-switch").onclick = ()=> setMode(state.mode==="signup"?"signin":"signup");
+
+$("au-submit").onclick = async ()=>{
+  const email=$("au-email").value.trim(), pass=$("au-pass").value, name=$("au-name").value.trim();
+  if(!email||!pass) return toast("Email and password, please");
+  if(state.mode==="signup" && !name) return toast("Add your name first");
+  $("au-submit").disabled=true; $("au-submit").textContent="One sec…";
+  try{
+    if(state.mode==="signup"){
+      const {data,error}=await sb.auth.signUp({email,password:pass});
+      if(error) throw error;
+      state._pendingName = name;
+      if(!data.session){ toast("Account made — now sign in"); setMode("signin"); }
+    } else {
+      const {error}=await sb.auth.signInWithPassword({email,password:pass});
+      if(error) throw error;
+    }
+  }catch(e){ toast(e.message||"Something went wrong"); }
+  $("au-submit").disabled=false; setMode(state.mode);
+};
+
+async function handleSession(session){
+  if(!session){ state.user=null; show("auth"); $("tabbar").style.display="none"; return; }
+  state.user = session.user;
+  await ensureProfile();
+  await loadCouple();
+}
+
+async function ensureProfile(){
+  const name = state._pendingName || state.user.email.split("@")[0];
+  const {data}=await sb.from("profiles").select("*").eq("id",state.user.id).maybeSingle();
+  if(!data){
+    await sb.from("profiles").insert({id:state.user.id, display_name:name});
+    state.profile={id:state.user.id, display_name:name};
+  } else { state.profile=data; }
+  state._pendingName=null;
+}
+
+/* ============================================================
+   3. PAIRING  (couple room)
+   ============================================================ */
+async function loadCouple(){
+  const {data}=await sb.from("couples").select("*")
+    .or(`member_a.eq.${state.user.id},member_b.eq.${state.user.id}`).maybeSingle();
+  if(!data || !data.member_b){
+    state.couple = data || null;
+    if(data && !data.member_b){ // created, waiting
+      show("pair"); $("pair-choose").style.display="none"; $("pair-created").style.display="block"; $("pair-join").style.display="none";
+      $("pc-code").textContent=data.code; pollForPartner();
+    } else { showPairChoose(); }
+    $("tabbar").style.display="none";
+    return;
+  }
+  state.couple=data;
+  await loadPartner();
+  enterApp();
+}
+function showPairChoose(){ show("pair"); $("pair-choose").style.display="block"; $("pair-created").style.display="none"; $("pair-join").style.display="none"; }
+$("pc-join").onclick=()=>{ $("pair-choose").style.display="none"; $("pair-join").style.display="block"; };
+$("pj-back").onclick=showPairChoose;
+
+$("pc-create").onclick=async ()=>{
+  let code, ok=false, tries=0;
+  while(!ok && tries++<6){
+    code=genCode();
+    const {error}=await sb.from("couples").insert({code, member_a:state.user.id});
+    if(!error){ ok=true; } else if(!/duplicate/i.test(error.message)){ return toast(error.message); }
+  }
+  if(!ok) return toast("Couldn't make a room — try again");
+  loadCouple();
+};
+$("pc-copy").onclick=()=>{ navigator.clipboard?.writeText($("pc-code").textContent); toast("Code copied"); };
+$("pj-submit").onclick=async ()=>{
+  const code=$("pj-code").value.trim().toUpperCase();
+  if(code.length<6) return toast("Enter the full 6-character code");
+  const {error}=await sb.rpc("join_couple",{couple_code:code});
+  if(error) return toast(error.message);
+  toast("You're in 💕"); loadCouple();
+};
+function pollForPartner(){
+  clearInterval(state.pairPoll);
+  state.pairPoll=setInterval(async ()=>{
+    const {data}=await sb.from("couples").select("*").eq("id",state.couple.id).maybeSingle();
+    if(data && data.member_b){ clearInterval(state.pairPoll); state.couple=data; await loadPartner(); enterApp(); }
+  },3500);
+}
+async function loadPartner(){
+  const pid = state.couple.member_a===state.user.id ? state.couple.member_b : state.couple.member_a;
+  const {data}=await sb.from("profiles").select("*").eq("id",pid).maybeSingle();
+  state.partner=data||{display_name:"Partner"};
+}
+
+[$("home-signout"),$("pair-signout")].forEach(b=>b.onclick=async ()=>{ await sb.auth.signOut(); location.reload(); });
+
+/* ============================================================
+   4. ENTER APP / HOME
+   ============================================================ */
+function enterApp(){ showApp("home"); renderHome(); }
+document.querySelectorAll(".tab").forEach(t=> t.onclick=()=> goTab(t.dataset.tab));
+document.querySelectorAll("[data-go]").forEach(b=> b.onclick=()=> goTab(b.dataset.go));
+function goTab(tab){
+  showApp(tab);
+  if(tab==="quizzes") renderCats();
+  if(tab==="stories") renderStories();
+  if(tab==="map") openMapTab();
+  if(tab==="home") renderHome();
+}
+
+async function renderHome(){
+  // avatars
+  const me=state.profile, them=state.partner;
+  $("home-avs").innerHTML =
+    `<div class="av" style="background:${colorFor(me.id)}">${initials(me.display_name)}</div>`+
+    `<div class="av" style="background:${colorFor(them.id)}">${initials(them.display_name)}</div>`+
+    `<div style="margin-left:14px;font-family:'Fraunces';font-weight:600">${me.display_name} & ${them.display_name}</div>`;
+  // anniversary
+  const c=state.couple;
+  if(c.anniversary){
+    const d=Math.floor((Date.now()-new Date(c.anniversary))/86400000);
+    $("home-days").textContent=d.toLocaleString();
+    $("home-since").textContent="since "+new Date(c.anniversary).toLocaleDateString(undefined,{month:"long",day:"numeric",year:"numeric"});
+    $("home-set-anniv").textContent="Edit anniversary";
+  } else { $("home-days").textContent="—"; $("home-since").textContent="not set yet"; }
+  // countdown
+  if(c.countdown_date){
+    const days=Math.ceil((new Date(c.countdown_date)-Date.now())/86400000);
+    $("home-cd-body").innerHTML=`<div style="font-family:'Fraunces';font-size:1.6rem;font-weight:600">${c.countdown_label||"Our day"}</div>`+
+      `<div class="muted">${days>0?days+" days to go":(days===0?"today! 🎉":"already happened")}</div>`;
+    $("home-set-cd").textContent="Edit countdown";
+  } else { $("home-cd-body").innerHTML=`<div class="muted">Nothing set — add a trip, anniversary, or reunion.</div>`; }
+  // quiz stats
+  const {data:ans}=await sb.from("quiz_answers").select("quiz_id,user_id,choice").eq("couple_id",c.id);
+  const byQ={};
+  (ans||[]).forEach(a=>{ (byQ[a.quiz_id]=byQ[a.quiz_id]||{})[a.user_id]=a.choice; });
+  let both=0,match=0,mine=0;
+  Object.values(byQ).forEach(o=>{ const k=Object.keys(o); if(o[state.user.id]!==undefined)mine++; if(k.length===2){both++; if(o[k[0]]===o[k[1]])match++;} });
+  $("home-answered").textContent=mine;
+  $("home-matchrate").textContent= both? Math.round(match/both*100)+"%":"—";
+}
+
+$("home-set-anniv").onclick=()=> dateModal("anniversary","Your anniversary","When did it begin?", state.couple.anniversary, async (val)=>{
+  await sb.from("couples").update({anniversary:val}).eq("id",state.couple.id); state.couple.anniversary=val; renderHome();
+});
+$("home-set-cd").onclick=()=>{
+  openModal(`<h2>Set a countdown</h2>
+    <label class="fld">What are you counting down to?</label>
+    <input class="input" id="cd-label" placeholder="e.g. Seeing each other again" value="${state.couple.countdown_label||""}">
+    <label class="fld">Date</label>
+    <input class="input" id="cd-date" type="date" value="${state.couple.countdown_date||""}">
+    <div style="height:14px"></div>
+    <button class="btn" id="cd-save">Save</button>`);
+  $("cd-save").onclick=async ()=>{
+    const label=$("cd-label").value.trim(), date=$("cd-date").value;
+    if(!date) return toast("Pick a date");
+    await sb.from("couples").update({countdown_label:label,countdown_date:date}).eq("id",state.couple.id);
+    state.couple.countdown_label=label; state.couple.countdown_date=date; closeModal(); renderHome();
+  };
+};
+function dateModal(field,title,sub,current,onSave){
+  openModal(`<h2>${title}</h2><p class="muted" style="margin:6px 0">${sub}</p>
+    <input class="input" id="dm-date" type="date" value="${current||""}">
+    <div style="height:14px"></div><button class="btn" id="dm-save">Save</button>`);
+  $("dm-save").onclick=async ()=>{ const v=$("dm-date").value; if(!v)return toast("Pick a date"); await onSave(v); closeModal(); };
+}
+
+/* ============================================================
+   5. QUIZ ENGINE
+   ============================================================ */
+const CATS=[
+  {id:"wyr", title:"Would You Rather", emoji:"🤔", bg:"linear-gradient(135deg,#E2674C,#C9503A)"},
+  {id:"nhie",title:"Never Have I Ever", emoji:"🙈", bg:"linear-gradient(135deg,#9B4F70,#7A3C58)"},
+  {id:"who", title:"Who's More Likely To", emoji:"👉", bg:"linear-gradient(135deg,#E6A93B,#C98B22)"},
+  {id:"tot", title:"This or That", emoji:"⚖️", bg:"linear-gradient(135deg,#5E8D7E,#436b5e)"},
+  {id:"deep",title:"Deeper Questions", emoji:"💭", bg:"linear-gradient(135deg,#6A6BA8,#4c4d86)"},
+];
+const QUIZZES = buildQuizzes();
+function renderCats(){
+  $("cat-grid").innerHTML = CATS.map(c=>{
+    const n=QUIZZES.filter(q=>q.cat===c.id).length;
+    return `<div class="cat" style="background:${c.bg}" data-cat="${c.id}">
+      <div class="emoji">${c.emoji}</div>
+      <div><div class="title">${c.title}</div><div class="meta">${n} prompts</div></div></div>`;
+  }).join("");
+  document.querySelectorAll(".cat").forEach(el=> el.onclick=()=> openList(el.dataset.cat));
+}
+async function openList(catId){
+  const cat=CATS.find(c=>c.id===catId);
+  $("ql-title").textContent=cat.title;
+  showApp("qlist");
+  const items=QUIZZES.filter(q=>q.cat===catId);
+  const {data:ans}=await sb.from("quiz_answers").select("quiz_id,user_id").eq("couple_id",state.couple.id);
+  const mine=new Set((ans||[]).filter(a=>a.user_id===state.user.id).map(a=>a.quiz_id));
+  const done=new Set(); const cnt={};
+  (ans||[]).forEach(a=>{cnt[a.quiz_id]=(cnt[a.quiz_id]||0)+1; if(cnt[a.quiz_id]===2)done.add(a.quiz_id);});
+  $("ql-items").innerHTML=items.map(q=>{
+    const status = done.has(q.id)?`<span style="color:#3E7A36;font-weight:600">revealed ✓</span>`
+      : mine.has(q.id)?`<span class="muted">waiting…</span>`:`<span class="muted">tap to play</span>`;
+    return `<div class="card pad" style="margin:10px 0;display:flex;justify-content:space-between;align-items:center;gap:12px;cursor:pointer" data-q="${q.id}">
+      <div style="font-weight:600">${q.prompt}</div><div style="font-size:.78rem;white-space:nowrap">${status}</div></div>`;
+  }).join("");
+  document.querySelectorAll("[data-q]").forEach(el=> el.onclick=()=> openQuiz(el.dataset.q));
+}
+$("ql-back").onclick=()=>{ showApp("quizzes"); renderCats(); };
+$("q-back").onclick=()=>{ stopPoll(); openList(state.cur.cat); };
+
+async function openQuiz(qid){
+  const q=QUIZZES.find(x=>x.id===qid); state.cur=q;
+  showApp("quiz");
+  $("q-cat").textContent=CATS.find(c=>c.id===q.cat).title;
+  $("q-prompt").textContent=q.prompt;
+  $("q-waiting").style.display="none"; $("q-reveal").style.display="none"; $("q-reveal").innerHTML="";
+  // build options
+  let opts=[];
+  if(q.cat==="who"){ opts=[{label:nameFor(state.partner.id)+" 💜",val:state.partner.id},{label:nameFor(state.user.id)+" 💛",val:state.user.id}]; }
+  else { opts=q.options.map((o,i)=>({label:o,val:String(i)})); }
+  // already answered?
+  const {data:existing}=await sb.from("quiz_answers").select("*").eq("couple_id",state.couple.id).eq("quiz_id",qid);
+  const myAns=(existing||[]).find(a=>a.user_id===state.user.id);
+  if(myAns){ afterAnswer(q,existing); return; }
+  $("q-options").style.display="block";
+  $("q-options").innerHTML=opts.map((o,i)=>`<button class="opt" data-val="${o.val}"><span class="k">${q.cat==="who"?(i+1):String.fromCharCode(65+i)}</span>${o.label}</button>`).join("");
+  document.querySelectorAll("#q-options .opt").forEach(b=> b.onclick=()=> submitAnswer(q,b.dataset.val));
+}
+async function submitAnswer(q,val){
+  await sb.from("quiz_answers").upsert({couple_id:state.couple.id,quiz_id:q.id,user_id:state.user.id,choice:val},{onConflict:"couple_id,quiz_id,user_id"});
+  const {data}=await sb.from("quiz_answers").select("*").eq("couple_id",state.couple.id).eq("quiz_id",q.id);
+  afterAnswer(q,data);
+}
+function afterAnswer(q,answers){
+  $("q-options").style.display="none";
+  if(answers.length===2){ stopPoll(); renderReveal(q,answers); }
+  else {
+    $("q-waiting").style.display="block";
+    $("q-waitname").textContent=`Waiting for ${state.partner.display_name}…`;
+    startPoll(q);
+  }
+}
+function startPoll(q){
+  stopPoll();
+  state.pollTimer=setInterval(async ()=>{
+    const {data}=await sb.from("quiz_answers").select("*").eq("couple_id",state.couple.id).eq("quiz_id",q.id);
+    if(data&&data.length===2){ stopPoll(); afterAnswer(q,data); }
+  },4000);
+}
+function stopPoll(){ clearInterval(state.pollTimer); }
+$("q-refresh").onclick=async ()=>{
+  const q=state.cur;
+  const {data}=await sb.from("quiz_answers").select("*").eq("couple_id",state.couple.id).eq("quiz_id",q.id);
+  if(data&&data.length===2) afterAnswer(q,data); else toast(`${state.partner.display_name} hasn't answered yet`);
+};
+function labelOf(q,choice){
+  if(q.cat==="who") return nameFor(choice);
+  return q.options[parseInt(choice)];
+}
+function renderReveal(q,answers){
+  const mine=answers.find(a=>a.user_id===state.user.id), theirs=answers.find(a=>a.user_id!==state.user.id);
+  const match=mine.choice===theirs.choice;
+  $("q-reveal").style.display="block";
+  $("q-reveal").innerHTML=`
+    <div class="center"><span class="badge ${match?"match":"diff"}">${match?"You matched! 💞":"Opposites 🌗"}</span></div>
+    <div class="reveal">
+      <div class="pick" style="background:${colorFor(state.user.id)}"><div class="who">${nameFor(state.user.id)}</div><div class="ans">${labelOf(q,mine.choice)}</div></div>
+      <div class="pick" style="background:${colorFor(theirs.user_id)}"><div class="who">${state.partner.display_name}</div><div class="ans">${labelOf(q,theirs.choice)}</div></div>
+    </div>
+    <button class="btn ghost" style="margin-top:18px" id="rev-next">Next prompt →</button>`;
+  $("rev-next").onclick=()=>{
+    const list=QUIZZES.filter(x=>x.cat===q.cat); const i=list.findIndex(x=>x.id===q.id);
+    if(i<list.length-1) openQuiz(list[i+1].id); else { toast("That's the last one here!"); openList(q.cat); }
+  };
+}
+
+/* ============================================================
+   6. PHOTOS (Supabase Storage, private bucket + signed URLs)
+   ============================================================ */
+async function uploadPhoto(file){
+  const ext=(file.name.split(".").pop()||"jpg").toLowerCase();
+  const path=`${state.couple.id}/${Date.now()}-${Math.random().toString(36).slice(2,8)}.${ext}`;
+  const {error}=await sb.storage.from("photos").upload(path,file,{contentType:file.type});
+  if(error) throw error;
+  return path;
+}
+async function signed(path){
+  const {data}=await sb.storage.from("photos").createSignedUrl(path,3600);
+  return data?.signedUrl||"";
+}
+
+/* ============================================================
+   7. STORIES / MOMENTS
+   ============================================================ */
+async function renderStories(){
+  const {data}=await sb.from("stories").select("*").eq("couple_id",state.couple.id).order("created_at",{ascending:false}).limit(40);
+  if(!data||!data.length){ $("stories-feed").innerHTML=`<div class="card pad center muted" style="margin-top:18px">No moments yet — tap ＋ to share the first one.</div>`; return; }
+  $("stories-feed").innerHTML="";
+  for(const s of data){
+    const url=await signed(s.image_path);
+    const when=timeAgo(s.created_at);
+    const seenMark = s.user_id===state.user.id ? (s.seen?`<span class="seen">Seen ✓</span>`:`<span class="seen">Sent</span>`) : "";
+    const div=document.createElement("div");
+    div.className="story card";
+    div.innerHTML=`<img src="${url}" loading="lazy"/><div class="cap"><div class="t">${s.caption||""}<div class="seen">${nameFor(s.user_id)}</div></div><div class="m">${when} ${seenMark}</div></div>`;
+    $("stories-feed").appendChild(div);
+    if(s.user_id!==state.user.id && !s.seen){ sb.from("stories").update({seen:true}).eq("id",s.id).then(()=>{}); }
+  }
+}
+$("story-fab").onclick=()=>{
+  openModal(`<h2>Share a moment</h2>
+    <label class="fld">Photo</label>
+    <input class="input" id="st-file" type="file" accept="image/*" capture="environment">
+    <img class="thumb" id="st-thumb">
+    <label class="fld">Caption (optional)</label>
+    <input class="input" id="st-cap" placeholder="what you're up to right now…">
+    <div style="height:14px"></div><button class="btn" id="st-save">Send to ${state.partner.display_name}</button>`);
+  $("st-file").onchange=e=>previewInto(e,"st-thumb");
+  $("st-save").onclick=async ()=>{
+    const f=$("st-file").files[0]; if(!f) return toast("Pick a photo first");
+    $("st-save").disabled=true; $("st-save").textContent="Sending…";
+    try{ const path=await uploadPhoto(f);
+      await sb.from("stories").insert({couple_id:state.couple.id,user_id:state.user.id,image_path:path,caption:$("st-cap").value.trim()});
+      closeModal(); renderStories(); toast("Shared 💛");
+    }catch(err){ toast(err.message); $("st-save").disabled=false; $("st-save").textContent="Send"; }
+  };
+};
+function previewInto(e,imgId){ const f=e.target.files[0]; if(!f)return; const img=$(imgId); img.src=URL.createObjectURL(f); img.style.display="block"; }
+function timeAgo(ts){ const s=(Date.now()-new Date(ts))/1000;
+  if(s<60)return"just now"; if(s<3600)return Math.floor(s/60)+"m ago"; if(s<86400)return Math.floor(s/3600)+"h ago";
+  if(s<604800)return Math.floor(s/86400)+"d ago"; return new Date(ts).toLocaleDateString(); }
+
+/* ============================================================
+   8. MEMORIES MAP
+   ============================================================ */
+let map, markers=[], miniMap, miniMarker, pendingLatLng=null;
+function openMapTab(){
+  if(!map){
+    map=L.map("map",{scrollWheelZoom:false}).setView([20,0],2);
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:19,attribution:"© OpenStreetMap"}).addTo(map);
+  }
+  setTimeout(()=>map.invalidateSize(),120);
+  loadMemories();
+}
+async function loadMemories(){
+  markers.forEach(m=>map.removeLayer(m)); markers=[];
+  const {data}=await sb.from("memories").select("*").eq("couple_id",state.couple.id).order("memory_date",{ascending:false});
+  const list=$("mem-list");
+  if(!data||!data.length){ list.innerHTML=`<div class="card pad center muted">No memories pinned yet — tap ＋ to add your first place.</div>`; return; }
+  const pts=[];
+  list.innerHTML="";
+  for(const m of data){
+    if(m.lat&&m.lng){
+      const mk=L.marker([m.lat,m.lng]).addTo(map);
+      const url=m.image_path?await signed(m.image_path):"";
+      mk.bindPopup(`${url?`<img src="${url}" style="width:160px;border-radius:8px;display:block;margin-bottom:6px">`:""}<b>${m.title||m.place||"Memory"}</b><br><span style="color:#7C6F63">${m.memory_date?new Date(m.memory_date).toLocaleDateString():""}</span>`);
+      markers.push(mk); pts.push([m.lat,m.lng]);
+    }
+    const thumb=m.image_path?await signed(m.image_path):"";
+    const row=document.createElement("div"); row.className="mem";
+    row.innerHTML=`${thumb?`<img src="${thumb}">`:`<div style="width:62px;height:62px;border-radius:14px;background:var(--line);flex:none"></div>`}
+      <div><div class="t">${m.title||m.place||"Memory"}</div><div class="s">${m.place?m.place+" · ":""}${m.memory_date?new Date(m.memory_date).toLocaleDateString():""}</div></div>`;
+    if(m.lat&&m.lng) row.onclick=()=>{ map.setView([m.lat,m.lng],11); window.scrollTo({top:0,behavior:"smooth"}); };
+    list.appendChild(row);
+  }
+  if(pts.length) map.fitBounds(pts,{padding:[40,40],maxZoom:9});
+}
+$("mem-fab").onclick=()=>{
+  pendingLatLng=null;
+  openModal(`<h2>Add a memory</h2>
+    <label class="fld">Photo (optional)</label>
+    <input class="input" id="me-file" type="file" accept="image/*">
+    <img class="thumb" id="me-thumb">
+    <label class="fld">Title</label>
+    <input class="input" id="me-title" placeholder="e.g. First trip to Moganshan">
+    <label class="fld">Place name (optional)</label>
+    <input class="input" id="me-place" placeholder="e.g. Moganshan, China">
+    <label class="fld">Date</label>
+    <input class="input" id="me-date" type="date">
+    <label class="fld">Where on the map? Tap to drop a pin</label>
+    <button class="btn ghost tiny" id="me-loc" style="width:100%;margin:6px 0">📍 Use my current location</button>
+    <div id="mini-map"></div>
+    <div style="height:16px"></div><button class="btn" id="me-save">Save memory</button>`);
+  $("me-file").onchange=e=>previewInto(e,"me-thumb");
+  setTimeout(()=>{
+    miniMap=L.map("mini-map").setView([20,0],2);
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:19}).addTo(miniMap);
+    miniMap.on("click",e=>setMini(e.latlng.lat,e.latlng.lng));
+    miniMap.invalidateSize();
+  },160);
+  $("me-loc").onclick=()=>{
+    if(!navigator.geolocation) return toast("Location not available");
+    navigator.geolocation.getCurrentPosition(p=>{ setMini(p.coords.latitude,p.coords.longitude); miniMap.setView([p.coords.latitude,p.coords.longitude],12); },()=>toast("Couldn't get location"));
+  };
+  $("me-save").onclick=async ()=>{
+    const title=$("me-title").value.trim();
+    if(!title) return toast("Give it a title");
+    $("me-save").disabled=true; $("me-save").textContent="Saving…";
+    try{
+      let path=null; const f=$("me-file").files[0]; if(f) path=await uploadPhoto(f);
+      await sb.from("memories").insert({couple_id:state.couple.id,user_id:state.user.id,title,
+        place:$("me-place").value.trim()||null, memory_date:$("me-date").value||null,
+        image_path:path, lat:pendingLatLng?.lat||null, lng:pendingLatLng?.lng||null});
+      closeModal(); loadMemories(); toast("Pinned 📍");
+    }catch(err){ toast(err.message); $("me-save").disabled=false; $("me-save").textContent="Save memory"; }
+  };
+};
+function setMini(lat,lng){ pendingLatLng={lat,lng}; if(miniMarker)miniMap.removeLayer(miniMarker); miniMarker=L.marker([lat,lng]).addTo(miniMap); }
+
+/* ============================================================
+   9. BOOT
+   ============================================================ */
+(function boot(){
+  setMode("signup");
+  if(!configured){
+    $("config-warn-slot").innerHTML=`<div class="config-warn">⚙️ Almost there — open <b>index.html</b> and paste your Supabase URL and anon key into the CONFIG block at the top of the script, then reload.</div>`;
+    $("au-submit").disabled=true; return;
+  }
+  sb.auth.getSession().then(({data})=>handleSession(data.session));
+  sb.auth.onAuthStateChange((_e,session)=>handleSession(session));
+})();
+
+/* ============================================================
+   10. QUIZ CONTENT  (~300 prompts)
+   ============================================================ */
+function buildQuizzes(){
+  const WYR=[
+    ["Travel the world for a year","Own your dream home"],["Always be 10 min late","Always be 20 min early"],
+    ["A cozy night in","A night out dancing"],["Read minds","Be invisible"],["Beach holiday","Mountain cabin"],
+    ["Never use a phone again","Never watch TV again"],["Have more time","Have more money"],
+    ["Be famous","Be the smartest person alive"],["Live by the ocean","Live in a big city"],
+    ["Forehead in the sand vacation","Action-packed adventure trip"],["Breakfast for every meal","Dinner for every meal"],
+    ["Sing every word you speak","Dance everywhere you go"],["Relive your best memory","See your future once"],
+    ["Have a personal chef","Have a personal driver"],["Summer forever","Winter forever"],
+    ["Be able to fly","Be able to teleport"],["Lose all your photos","Lose all your messages"],
+    ["Camp under the stars","Five-star hotel"],["Coffee every morning","Tea every morning"],
+    ["Win the lottery","Find your perfect job"],["Speak every language","Play every instrument"],
+    ["Spicy food","Sweet food"],["A huge wedding","A tiny elopement"],["Sunrise person","Sunset person"],
+    ["Live in the past","Live in the future"],["A dog","A cat"],["Be a morning person","Be a night owl"],
+    ["Cook together","Order in together"],["Long road trip","Quick flight"],["Plan everything","Go with the flow"],
+    ["Give up coffee","Give up dessert"],["A quiet weekend","A packed weekend"],["Hike a mountain","Lie on a beach"],
+    ["Always know the truth","Always be blissfully unaware"],["Movie marathon","Game night"],
+    ["Live somewhere new every year","Stay in one place forever"],["Be 10 years younger","Be 10 years wiser"],
+    ["Surprise trip","Carefully planned trip"],["Texting","Calling"],["Front-row seats","Backstage passes"],
+    ["A garden","A pool"],["Snow day","Rainy day"],["Wake up early on weekends","Sleep in always"],
+    ["Have a twin","Be an only child"],["Endless books","Endless music"],["A treehouse","A houseboat"],
+    ["Travel to space","Explore the ocean floor"],["Be the best cook in town","Be the best dancer in town"],
+    ["Big family dinners","Quiet dinners for two"],["Live near the family","Live far and visit often"],
+    ["Time travel to the past","Time travel to the future"],["Pause time","Rewind time"],
+    ["Be a great writer","Be a great painter"],["Never feel cold","Never feel hot"],
+    ["Always have a clean house","Never do laundry again"],["Adventure date","Relaxing date"],
+    ["A picnic","A fancy restaurant"],["Be taller","Be faster"],["A surprise party","A quiet celebration"],
+    ["Visit every country","Master one place deeply"],["Karaoke night","Board-game night"],
+    ["Have one true talent","Be okay at everything"],["A vintage car","A brand-new car"],
+    ["Live in a cabin in the woods","Live in a loft downtown"],["A long bath","A quick shower"],
+    ["Be unforgettable","Be irreplaceable"],["Stargaze all night","Sleep early and rise with the sun"],
+    ["A spontaneous yes","A thoughtful maybe"],["Hold hands in public","Whisper inside jokes"],
+    ["Slow-dance in the kitchen","Watch the sunset in silence"],["Write each other letters","Leave each other voice notes"],
+    ["Build a life of routines","Build a life of surprises"],
+  ];
+  const NHIE=[
+    "stayed up all night talking","cried at a movie","sent a text to the wrong person","gone skinny dipping",
+    "fallen asleep in a public place","sung karaoke sober","forgotten an important birthday","road-tripped with no plan",
+    "kept a diary","been on TV","broken a bone","gotten a tattoo","pulled an all-nighter for fun","met someone famous",
+    "lied about my age","danced in the rain","gone a whole day without my phone","cooked a meal that totally failed",
+    "had a crush on a teacher","stolen a fry off your plate","re-gifted a present","faked being sick to skip something",
+    "gotten lost in a new city","stayed in bed all day","screamed on a roller coaster","binged a whole series in a day",
+    "gone camping","sent a risky text","laughed so hard I cried","missed a flight","tried to cut my own hair",
+    "kept a secret for years","talked my way out of a ticket","fallen for a prank","had stage fright",
+    "eaten something I shouldn't have","gone vegetarian for a while","run a race","written a love letter",
+    "made a wish on a shooting star","gone a month without spending money","ghosted someone","won a trophy",
+    "been the designated driver all night","cried happy tears","kept a childhood toy","slept under the stars",
+    "gotten a nickname I hated","performed on a stage","made a New Year's resolution I kept","tried to learn a TikTok dance",
+    "snooped through someone's playlist","saved a voicemail just to keep hearing it","planned a surprise that worked perfectly",
+    "rehearsed a conversation in the mirror","gotten butterflies before a date","reread old messages just to smile",
+    "memorized someone's coffee order","stayed on the phone until we both fell asleep",
+  ];
+  const WHO=[
+    "say I love you first","cry during a sad movie","plan the surprise","forget where they put their keys",
+    "win an argument","start a food fight","get lost without GPS","fall asleep first","apologize first",
+    "take the most photos","over-pack for a trip","sing in the shower","be late","make the other laugh hardest",
+    "spend too much online","cook dinner","do a spontaneous dance","remember the anniversary",
+    "talk to strangers","be the messy one","start a deep conversation at 2am","give the best gifts",
+    "survive a zombie apocalypse","steal the blanket at night","reply to texts the fastest",
+    "ask for directions","cry happy tears at a wedding","be the calm one in a crisis","pick the restaurant",
+    "win a dance-off","get distracted mid-task","plan the perfect date","be the first to say sorry",
+    "send good-morning texts","keep a secret","get emotional over a song","want dessert first",
+    "make the bed","forget a password","drive on the road trip","take the longest in the bathroom",
+    "make friends with the waiter","plan the whole vacation itinerary","be the one to say 'just five more minutes'",
+    "burn the toast","know everyone's birthdays","start humming a random song","cry at a commercial",
+    "be the first to wake up","leave the dishes for later","laugh at their own joke","pick the movie",
+    "say 'I'm not tired' then fall asleep","start the playlist","double-text","be the better navigator",
+    "remember tiny details","want to stay out later","initiate the cuddle","plan the next trip already",
+  ];
+  const TOT=[
+    ["Coffee","Tea"],["Mountains","Beach"],["Morning","Night"],["Sweet","Savory"],["Books","Movies"],
+    ["Cats","Dogs"],["Call","Text"],["City","Countryside"],["Spring","Autumn"],["Plan","Spontaneous"],
+    ["Window seat","Aisle seat"],["Pizza","Tacos"],["Quiet","Loud"],["Sunrise","Sunset"],["Cook","Order in"],
+    ["Adventure","Relaxation"],["Tidy","Cozy clutter"],["Early","Late"],["Hot","Cold"],["Music","Podcasts"],
+    ["Road trip","Flight"],["Save","Spend"],["Comedy","Drama"],["Tea in bed","Walk outside"],["Chocolate","Vanilla"],
+    ["Stay in","Go out"],["Big group","Just us"],["Fancy","Casual"],["Risk","Safe bet"],["Talk it out","Need space"],
+    ["Plant person","No plants"],["Snow","Rain"],["Surprise","Heads-up"],["Handwritten","Typed"],["Salty","Sweet"],
+    ["Dance","Sing"],["Beach read","Deep novel"],["New places","Favorite places"],["Phone call","Voice note"],
+    ["Brunch","Late dinner"],["Camping","Hotel"],["Window open","Window closed"],["Espresso","Latte"],
+    ["Slow morning","Productive morning"],["Sneakers","Boots"],["Mountains in summer","Mountains in winter"],
+    ["Picnic","Restaurant"],["Map it out","Wing it"],["Action","Rom-com"],["Tea ceremony","Quick cup"],
+    ["Lights on","Candlelight"],["Front seat","Back seat"],["Game night","Movie night"],["Sea","Lake"],
+    ["First date butterflies","Comfortable silence"],["Long letters","Quick check-ins"],["Stay up","Sleep in"],
+    ["Cook breakfast","Cook dinner"],["Walk","Drive"],["Slow song","Upbeat song"],
+  ];
+  const DEEP=[
+    {q:"What makes you feel most loved?",o:["Words","Quality time","Touch","Acts of help"]},
+    {q:"Your ideal weekend together is…",o:["Total rest","Exploring somewhere new","Seeing friends","A project together"]},
+    {q:"When you're stressed, you most want…",o:["Space to think","To talk it through","A distraction","A hug"]},
+    {q:"What matters most in five years?",o:["Adventure","Stability","Growth","Closeness"]},
+    {q:"Your love language for giving is…",o:["Words","Gifts","Time","Help"]},
+    {q:"After a hard day you crave…",o:["Quiet","Comfort food","A long talk","Sleep"]},
+    {q:"The best part of us is…",o:["How we laugh","How we talk","How we dream","How we're calm together"]},
+    {q:"You'd rather grow old…",o:["Traveling","In one cozy home","Surrounded by family","Trying new things"]},
+    {q:"What recharges you most?",o:["Alone time","Time with me","Time outdoors","Doing something creative"]},
+    {q:"A perfect anniversary looks like…",o:["A trip","A quiet night in","A new experience","Recreating a first date"]},
+    {q:"What scares you a little about the future?",o:["Distance","Routine","Change","Missing out"]},
+    {q:"The dream home is…",o:["By the sea","In the mountains","In the city","On the move"]},
+    {q:"You feel closest to me when…",o:["We're talking late","We're being silly","We're quiet together","We're working toward something"]},
+    {q:"What do you want more of in our days?",o:["Spontaneity","Calm","Adventure","深 conversations"]},
+    {q:"The kind of partner you want to be is…",o:["Supportive","Fun","Steady","Inspiring"]},
+    {q:"What's your idea of comfort?",o:["A warm meal","A familiar place","A long hug","A good talk"]},
+    {q:"When we disagree, you'd rather…",o:["Solve it now","Cool off first","Find the middle","Talk it all out"]},
+    {q:"What would make you proudest of us?",o:["Building something","Staying close","Helping others","Living fully"]},
+    {q:"A meaningful gift to you is…",o:["Something handmade","An experience","A heartfelt note","Time together"]},
+    {q:"You'd describe our energy as…",o:["Playful","Calm","Adventurous","Deep"]},
+    {q:"What helps you feel secure?",o:["Routine","Reassurance","Plans","Independence"]},
+    {q:"How do you most like to celebrate wins?",o:["Quietly","Big party","A special dinner","A getaway"]},
+    {q:"What's your favorite kind of morning?",o:["Slow and lazy","Early and active","Coffee and talk","Sleep till noon"]},
+    {q:"What do you value most day-to-day?",o:["Kindness","Honesty","Humor","Loyalty"]},
+    {q:"The future trip you most want is…",o:["A beach","A city","A mountain trek","A road trip"]},
+    {q:"You feel most yourself when…",o:["Creating","Resting","Exploring","Connecting"]},
+    {q:"What's the best way to apologize to you?",o:["Words","Time","A small act","A hug"]},
+    {q:"What does 'home' mean to you?",o:["A place","A person","A feeling","A routine"]},
+    {q:"What's your hope for us this year?",o:["More adventure","More calm","More closeness","More growth"]},
+    {q:"You'd rather be remembered for…",o:["Kindness","Achievements","Adventures","Love"]},
+    {q:"What's your comfort on a rainy day?",o:["A movie","A book","A nap","Cooking"]},
+    {q:"What do you most want to learn together?",o:["A language","To cook","An instrument","A sport"]},
+    {q:"Your ideal pace of life is…",o:["Fast and full","Slow and steady","Balanced","Seasonal"]},
+    {q:"What's the most romantic gesture to you?",o:["A surprise","A letter","Undivided attention","A shared ritual"]},
+    {q:"How do you handle big decisions?",o:["Lists and logic","Gut feeling","Talk it out","Sleep on it"]},
+    {q:"What makes a tradition special to you?",o:["Repetition","The people","The meaning","The surprise"]},
+    {q:"What's your favorite season of us so far?",o:["The beginning","Right now","Yet to come","Every part"]},
+    {q:"What do you need when you're sad?",o:["To be held","To be heard","To be distracted","To be alone a bit"]},
+    {q:"The best date is one that's…",o:["Adventurous","Relaxed","Romantic","Unexpected"]},
+    {q:"What's most important in a home together?",o:["Comfort","Style","Space","Location"]},
+    {q:"What kind of support do you value most?",o:["Encouragement","Practical help","Just listening","Honest advice"]},
+    {q:"What's your favorite way to reconnect after time apart?",o:["A long talk","A good meal","Just being close","A little adventure"]},
+    {q:"What would your perfect ordinary day include?",o:["A walk","A great meal","A long talk","A little nap"]},
+    {q:"What do you want our place to feel like?",o:["Cozy","Lively","Peaceful","Inspiring"]},
+    {q:"How do you like to show you care?",o:["Doing things","Saying things","Giving things","Being present"]},
+    {q:"What's the dream we should chase first?",o:["Travel","A home","A project","A family"]},
+    {q:"What keeps a relationship strong, to you?",o:["Communication","Trust","Fun","Patience"]},
+    {q:"What's your favorite small ritual of ours?",o:["Morning coffee","Goodnight texts","Weekend plans","Inside jokes"]},
+    {q:"When you imagine 'us, ten years on,' you feel…",o:["Excited","Peaceful","Curious","Grateful"]},
+    {q:"What's the best thing we make together?",o:["Memories","Laughter","Plans","A home"]},
+  ];
+  const out=[];
+  WYR.forEach((o,i)=>out.push({id:"wyr-"+i,cat:"wyr",prompt:"Would you rather…",options:o,sub:o.join(" or ")}));
+  // give WYR a readable prompt:
+  out.forEach(q=>{ if(q.cat==="wyr") q.prompt=q.options[0]+"  —or—  "+q.options[1]; });
+  NHIE.forEach((s,i)=>out.push({id:"nhie-"+i,cat:"nhie",prompt:"Never have I ever "+s,options:["I have 🙋","Never 🙅"]}));
+  WHO.forEach((s,i)=>out.push({id:"who-"+i,cat:"who",prompt:"Who's more likely to "+s+"?",options:[]}));
+  TOT.forEach((o,i)=>out.push({id:"tot-"+i,cat:"tot",prompt:o[0]+"  or  "+o[1]+"?",options:o}));
+  DEEP.forEach((d,i)=>out.push({id:"deep-"+i,cat:"deep",prompt:d.q,options:d.o}));
+  return out;
+}
+</script>
+</body>
+</html>
