@@ -357,7 +357,18 @@ const SUPABASE_ANON = "sb_publishable_U682uX1rSxZ1_DJaHywIsg_7HTOm_ZZ";   // pub
 
 const configured = !SUPABASE_URL.includes("PASTE") && !SUPABASE_ANON.includes("PASTE");
 let sb = null;
-if (configured) sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+if (configured) sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON, {
+  auth: {
+    persistSession: true,
+    autoRefreshToken: true,
+    detectSessionInUrl: false,
+    storageKey: "tether-auth",
+    // Bypass the browser Web Locks API — it deadlocks auth calls on Safari/iOS
+    // and standalone (home-screen) apps. A 2-person app never needs cross-tab
+    // auth coordination, so a pass-through lock is safe.
+    lock: (name, acquireTimeout, fn) => fn()
+  }
+});
 
 const $ = id => document.getElementById(id);
 const state = { user:null, profile:null, couple:null, partner:null, mode:"signup", cur:null, pollTimer:null };
@@ -389,13 +400,13 @@ function genCode(){ const c="ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; let s=""; for(le
    ============================================================ */
 function setMode(m){
   state.mode=m;
-  $("au-name-wrap")? null:null;
   $("auth-name-wrap").style.display = m==="signup" ? "block":"none";
   $("au-submit").textContent = m==="signup" ? "Create account":"Sign in";
   $("au-switch-text").textContent = m==="signup" ? "Already have an account?":"New here?";
   $("au-switch").textContent = m==="signup" ? "Sign in":"Create one";
 }
 $("au-switch").onclick = ()=> setMode(state.mode==="signup"?"signin":"signup");
+function withTimeout(p,ms){ return Promise.race([p, new Promise((_,rej)=>setTimeout(()=>rej(new Error("That took too long — check your connection and try again.")),ms))]); }
 
 $("au-submit").onclick = async ()=>{
   const email=$("au-email").value.trim(), pass=$("au-pass").value, name=$("au-name").value.trim();
@@ -404,12 +415,12 @@ $("au-submit").onclick = async ()=>{
   $("au-submit").disabled=true; $("au-submit").textContent="One sec…";
   try{
     if(state.mode==="signup"){
-      const {data,error}=await sb.auth.signUp({email,password:pass});
+      const {data,error}=await withTimeout(sb.auth.signUp({email,password:pass}),15000);
       if(error) throw error;
       state._pendingName = name;
       if(!data.session){ toast("Account made — now sign in"); setMode("signin"); }
     } else {
-      const {error}=await sb.auth.signInWithPassword({email,password:pass});
+      const {error}=await withTimeout(sb.auth.signInWithPassword({email,password:pass}),15000);
       if(error) throw error;
     }
   }catch(e){ toast(e.message||"Something went wrong"); }
