@@ -1051,20 +1051,20 @@ function buildSets(){
         ["Call","Text"],["City","Countryside"],["Stay in","Go out"],["Sunrise","Sunset"],["Plan","Wing it"],
       ]},
       {name:"🏠 Dream House", pic:true, q:[
-        {a:["Modern Mansion","modern,mansion","🏛️"], b:["Cozy Cabin","log,cabin","🪵"]},
-        {a:["Beach House","beach,house","🏖️"], b:["City Penthouse","penthouse,skyline","🌆"]},
-        {a:["Glass House in the Forest","glass,house","🌲"], b:["Stone Cottage","stone,cottage","🏡"]},
-        {a:["Loft Downtown","loft,apartment","🧱"], b:["Farmhouse","farmhouse","🌾"]},
-        {a:["Treehouse","treehouse","🌳"], b:["Houseboat","houseboat","⛵"]},
-        {a:["Tiny Home","tiny,house","📦"], b:["Sprawling Estate","luxury,estate","🏰"]},
+        {a:["Modern Mansion","a stunning modern luxury mansion exterior, architectural photography, golden hour","🏛️"], b:["Cozy Cabin","a cozy wooden log cabin in a snowy pine forest, warm glowing lights, cinematic","🪵"]},
+        {a:["Beach House","a beautiful modern beach house by the ocean with palm trees, sunny, architectural photography","🏖️"], b:["City Penthouse","a luxury city penthouse with floor to ceiling windows and skyline view at night","🌆"]},
+        {a:["Glass House in the Forest","a modern glass house nestled in a lush green forest, architectural photography","🌲"], b:["Stone Cottage","a charming stone cottage in the english countryside with flowers, sunny day","🏡"]},
+        {a:["Loft Downtown","a stylish industrial loft apartment with big windows and exposed brick, modern interior","🧱"], b:["Farmhouse","a beautiful white farmhouse with a wraparound porch in the countryside, golden hour","🌾"]},
+        {a:["Treehouse","a magical wooden treehouse high among tall trees, cozy, cinematic lighting","🌳"], b:["Houseboat","a charming houseboat moored on a calm canal at sunset","⛵"]},
+        {a:["Tiny Home","a beautiful modern tiny house surrounded by nature, cozy and sunny","📦"], b:["Sprawling Estate","a grand sprawling luxury estate with manicured gardens, aerial view, golden hour","🏰"]},
       ]},
       {name:"✈️ Dream Vacation", pic:true, q:[
-        {a:["Maldives Overwater","maldives,beach","🏝️"], b:["Swiss Alps Chalet","alps,snow","🏔️"]},
-        {a:["Paris","paris,eiffel","🗼"], b:["Tokyo","tokyo,city","🏯"]},
-        {a:["Safari in Kenya","safari,africa","🦁"], b:["Mediterranean Cruise","cruise,ship","🚢"]},
-        {a:["Santorini","santorini,greece","🇬🇷"], b:["Bali","bali,beach","🌺"]},
-        {a:["Northern Lights, Iceland","iceland,aurora","🌌"], b:["Tropical Hawaii","hawaii,beach","🌴"]},
-        {a:["Roman Holiday","rome,colosseum","🏛️"], b:["Kyoto Temples","kyoto,temple","⛩️"]},
+        {a:["Maldives Overwater","Maldives overwater bungalows over turquoise water, aerial travel photography","🏝️"], b:["Swiss Alps Chalet","a cozy wooden chalet in the snowy Swiss Alps with mountain views, cinematic","🏔️"]},
+        {a:["Paris","the Eiffel Tower in Paris at golden hour, beautiful travel photography","🗼"], b:["Tokyo","Tokyo city skyline at night with neon lights, travel photography","🏯"]},
+        {a:["Safari in Kenya","an African safari with elephants on the savanna at sunset, wildlife photography","🦁"], b:["Mediterranean Cruise","a luxury cruise ship sailing the blue Mediterranean sea, sunny, travel photography","🚢"]},
+        {a:["Santorini","Santorini Greece white buildings with blue domes overlooking the sea, sunny","🇬🇷"], b:["Bali","a tropical Bali resort with lush rice terraces and palm trees, travel photography","🌺"]},
+        {a:["Northern Lights, Iceland","the green northern lights aurora over snowy Iceland mountains at night","🌌"], b:["Tropical Hawaii","a tropical Hawaii beach with palm trees and turquoise water, sunny day","🌴"]},
+        {a:["Roman Holiday","the Colosseum in Rome at golden hour, beautiful travel photography","🏛️"], b:["Kyoto Temples","a traditional Kyoto temple with cherry blossoms in Japan, serene and beautiful","⛩️"]},
       ]},
     ],
     deep:[
@@ -1095,7 +1095,7 @@ function buildSets(){
     ],
   };
 
-  function imgUrl(kw){ let h=0; for(let i=0;i<kw.length;i++)h=(h*31+kw.charCodeAt(i))>>>0; return "https://loremflickr.com/600/450/"+encodeURIComponent(kw)+"?lock="+(h%9000+100); }
+  function imgUrl(prompt){ let h=0; for(let i=0;i<prompt.length;i++)h=(h*31+prompt.charCodeAt(i))>>>0; return "https://gen.pollinations.ai/image/"+encodeURIComponent(prompt)+"?width=600&height=800&nologo=true&seed="+(h%100000); }
   const SETS={}, QUIZZES=[];
   Object.keys(SETDATA).forEach(cat=>{
     SETS[cat]=SETDATA[cat].map((set,si)=>{
