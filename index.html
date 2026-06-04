@@ -160,6 +160,20 @@ label.fld{display:block;font-size:.8rem;font-weight:600;color:var(--soft);margin
 .mdot{width:22px;height:22px;border-radius:50%;display:grid;place-items:center;font-size:.8rem;font-weight:700;flex:none}
 .deepans{padding:15px 16px;border-radius:16px;color:#fff;margin-top:10px;line-height:1.45;white-space:pre-wrap;word-break:break-word}
 .deepans .who{font-size:.72rem;font-weight:700;opacity:.85;text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px}
+.picgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:6px}
+.picopt{position:relative;border:0;padding:0;border-radius:18px;overflow:hidden;cursor:pointer;aspect-ratio:3/4;background:linear-gradient(150deg,#E8A07E,#9B4F70);box-shadow:var(--shadow)}
+.picopt:active{transform:scale(.98)}
+.picopt .picimg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.picopt .piclbl{position:absolute;left:0;right:0;bottom:0;padding:24px 12px 12px;color:#fff;font-weight:700;font-size:.95rem;text-align:left;
+  background:linear-gradient(transparent,rgba(0,0,0,.65));text-shadow:0 1px 4px rgba(0,0,0,.5)}
+.picopt .pe{font-size:1.1rem}
+.picopt.noimg .piclbl{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:none;text-shadow:none;font-size:1.05rem;text-align:center;gap:8px}
+.picopt.noimg .pe{font-size:2.6rem}
+.georow{padding:11px 13px;border:1px solid var(--line);border-radius:13px;margin:7px 0;font-size:.84rem;cursor:pointer;background:var(--paper);line-height:1.35}
+.georow:active{background:var(--cream)}
+.mappin{width:20px;height:20px;background:var(--c,#E2674C);border:2.5px solid #fff;border-radius:50% 50% 50% 0;transform:rotate(-45deg);box-shadow:0 3px 7px rgba(0,0,0,.35)}
+.leaflet-popup-content-wrapper{border-radius:14px}
+.leaflet-popup-content{font-family:'Hanken Grotesk',sans-serif;margin:12px 14px}
 </style>
 </head>
 <body>
@@ -556,15 +570,12 @@ const CATS=[
   {id:"tot", title:"This or That", emoji:"⚖️", bg:"linear-gradient(135deg,#5E8D7E,#436b5e)"},
   {id:"deep",title:"Deeper Questions", emoji:"💭", bg:"linear-gradient(135deg,#6A6BA8,#4c4d86)"},
 ];
-const QUIZZES=buildQuizzes();
-const PACK_SIZE=10;
-const PACKS={};
-CATS.forEach(c=>{ if(c.id==="deep")return; const items=QUIZZES.filter(q=>q.cat===c.id); const p=[]; for(let i=0;i<items.length;i+=PACK_SIZE)p.push(items.slice(i,i+PACK_SIZE)); PACKS[c.id]=p; });
+const {SETS,QUIZZES}=buildSets();
 
 function renderCats(){
   $("cat-grid").innerHTML=CATS.map(c=>{
-    const total=QUIZZES.filter(q=>q.cat===c.id).length;
-    const meta = c.id==="deep" ? total+" written questions" : PACKS[c.id].length+" sets · "+total+" prompts";
+    const sets=SETS[c.id].length;
+    const meta = c.id==="deep" ? sets+" themes · written" : sets+" themed sets";
     return `<div class="cat" style="background:${c.bg}" data-cat="${c.id}"><div class="emoji">${c.emoji}</div><div><div class="title">${c.title}</div><div class="meta">${meta}</div></div></div>`;
   }).join("");
   document.querySelectorAll(".cat").forEach(el=>el.onclick=()=>openCategory(el.dataset.cat));
@@ -573,6 +584,7 @@ $("ql-back").onclick=()=>{ stopPoll(); showApp("quizzes"); renderCats(); };
 
 async function openCategory(catId){
   stopPoll();
+  $("ql-back").onclick=()=>{ stopPoll(); showApp("quizzes"); renderCats(); };
   $("ql-title").textContent=CATS.find(c=>c.id===catId).title;
   showApp("qlist");
   const {data:ans}=await sb.from("quiz_answers").select("quiz_id,user_id").eq("couple_id",state.couple.id);
@@ -580,35 +592,35 @@ async function openCategory(catId){
   (ans||[]).forEach(a=>{ if(a.user_id===state.user.id)mine.add(a.quiz_id); else partner.add(a.quiz_id); });
 
   if(catId==="deep"){
-    $("ql-sub").textContent="Write your own answer, then read each other's.";
-    const items=QUIZZES.filter(q=>q.cat==="deep");
-    $("ql-items").innerHTML=items.map(q=>{
-      const status=(mine.has(q.id)&&partner.has(q.id))?`<span style="color:#3E7A36;font-weight:600">shared ✓</span>`
-        :mine.has(q.id)?`<span class="muted">waiting…</span>`:`<span class="muted">your turn</span>`;
-      return `<div class="card pad" style="margin:10px 0;display:flex;justify-content:space-between;align-items:center;gap:12px;cursor:pointer" data-deep="${q.id}"><div style="font-weight:600">${q.prompt}</div><div style="font-size:.78rem;white-space:nowrap">${status}</div></div>`;
+    $("ql-sub").textContent="Pick a theme, write your own answer, then read each other's.";
+    $("ql-items").innerHTML=SETS.deep.map((set,idx)=>{
+      const ids=set.items.map(q=>q.id);
+      const done=ids.filter(id=>mine.has(id)&&partner.has(id)).length;
+      const status= done===ids.length?`<span style="color:#3E7A36;font-weight:600">all shared ✓</span>`:`<span class="muted">${done}/${ids.length} shared</span>`;
+      return `<div class="card pad" style="margin:10px 0;display:flex;justify-content:space-between;align-items:center;gap:12px;cursor:pointer" data-dset="${idx}"><div><div style="font-weight:700">${set.name}</div><div class="muted" style="font-size:.8rem">${ids.length} questions</div></div><div style="font-size:.78rem;white-space:nowrap">${status}</div></div>`;
     }).join("");
-    document.querySelectorAll("[data-deep]").forEach(el=>el.onclick=()=>openDeep(el.dataset.deep));
+    document.querySelectorAll("[data-dset]").forEach(el=>el.onclick=()=>openDeepSet(parseInt(el.dataset.dset)));
     return;
   }
 
-  $("ql-sub").textContent="Each set is 10 prompts — answer them, then see how you lined up.";
-  $("ql-items").innerHTML=PACKS[catId].map((items,idx)=>{
-    const ids=items.map(q=>q.id);
+  $("ql-sub").textContent="Answer a themed set on your own, then see how you lined up.";
+  $("ql-items").innerHTML=SETS[catId].map((set,idx)=>{
+    const ids=set.items.map(q=>q.id);
     const myCnt=ids.filter(id=>mine.has(id)).length, paCnt=ids.filter(id=>partner.has(id)).length;
     let status;
     if(myCnt===ids.length&&paCnt===ids.length) status=`<span style="color:#3E7A36;font-weight:600">revealed ✓</span>`;
     else if(myCnt===ids.length) status=`<span class="muted">waiting for ${state.partner.display_name}…</span>`;
     else if(myCnt>0) status=`<span class="muted">${myCnt}/${ids.length} answered</span>`;
     else status=`<span class="muted">tap to start</span>`;
-    return `<div class="card pad" style="margin:10px 0;display:flex;justify-content:space-between;align-items:center;gap:12px;cursor:pointer" data-pack="${idx}"><div><div style="font-weight:700">Set ${idx+1}</div><div class="muted" style="font-size:.8rem">${ids.length} prompts</div></div><div style="font-size:.78rem;white-space:nowrap">${status}</div></div>`;
+    return `<div class="card pad" style="margin:10px 0;display:flex;justify-content:space-between;align-items:center;gap:12px;cursor:pointer" data-set="${idx}"><div><div style="font-weight:700">${set.name}</div><div class="muted" style="font-size:.8rem">${ids.length} prompts${set.pic?" · 📸 pictures":""}</div></div><div style="font-size:.78rem;white-space:nowrap">${status}</div></div>`;
   }).join("");
-  document.querySelectorAll("[data-pack]").forEach(el=>el.onclick=()=>openPack(catId,parseInt(el.dataset.pack)));
+  document.querySelectorAll("[data-set]").forEach(el=>el.onclick=()=>openSet(catId,parseInt(el.dataset.set)));
 }
 
 /* ---- set player ---- */
-async function openPack(catId,idx){
-  const items=PACKS[catId][idx];
-  state.pack={catId,idx,items,pos:0,answers:{}};
+async function openSet(catId,idx){
+  const set=SETS[catId][idx], items=set.items;
+  state.pack={catId,idx,items,pos:0,answers:{},name:set.name};
   showApp("quiz");
   $("q-back").onclick=()=>{ stopPoll(); openCategory(catId); };
   const ids=items.map(q=>q.id);
@@ -623,14 +635,20 @@ function packOptions(q){
   return q.options.map((o,i)=>({label:o,val:String(i)}));
 }
 function renderPackQuestion(){
-  const p=state.pack, q=p.items[p.pos], opts=packOptions(q);
+  const p=state.pack, q=p.items[p.pos];
+  let optsHtml;
+  if(q.type==="pic"){
+    optsHtml=`<div class="picgrid">`+q.pics.map((pic,i)=>`<button class="picopt" data-val="${i}"><img class="picimg" src="${pic.img}" alt="" loading="lazy" onerror="this.style.display='none';this.parentElement.classList.add('noimg')"><div class="piclbl"><span class="pe">${pic.emoji}</span> ${pic.label}</div></button>`).join("")+`</div>`;
+  } else {
+    optsHtml=packOptions(q).map((o,i)=>`<button class="opt" data-val="${o.val}"><span class="k">${q.cat==="who"?(i+1):String.fromCharCode(65+i)}</span>${o.label}</button>`).join("");
+  }
   $("q-card").innerHTML=`
-    <div class="qnum">Set ${p.idx+1} · ${CATS.find(c=>c.id===p.catId).title}</div>
+    <div class="qnum">${p.name}</div>
     <div class="qprog"><i style="width:${Math.round(p.pos/p.items.length*100)}%"></i></div>
-    <div class="muted" style="font-size:.8rem;margin-bottom:6px">Question ${p.pos+1} of ${p.items.length}</div>
-    <div class="qprompt">${q.prompt}</div>
-    <div id="q-options">${opts.map((o,i)=>`<button class="opt" data-val="${o.val}"><span class="k">${q.cat==="who"?(i+1):String.fromCharCode(65+i)}</span>${o.label}</button>`).join("")}</div>`;
-  document.querySelectorAll("#q-options .opt").forEach(b=>b.onclick=()=>pickAnswer(q,b.dataset.val));
+    <div class="muted" style="font-size:.8rem;margin-bottom:8px">Question ${p.pos+1} of ${p.items.length}</div>
+    <div class="qprompt"${q.type==="pic"?' style="font-size:1.3rem"':""}>${q.prompt}</div>
+    <div id="q-options">${optsHtml}</div>`;
+  document.querySelectorAll("#q-options .opt,#q-options .picopt").forEach(b=>b.onclick=()=>pickAnswer(q,b.dataset.val));
 }
 function pickAnswer(q,val){
   const p=state.pack; p.answers[q.id]=val;
@@ -669,11 +687,28 @@ function renderPackResults(byQ){
 function labelOf(q,choice){ if(q.cat==="who")return nameFor(choice); return q.options[parseInt(choice)]; }
 
 /* ---- deeper questions (written) ---- */
+async function openDeepSet(idx){
+  stopPoll(); state.deepSet=idx;
+  const set=SETS.deep[idx];
+  $("ql-title").textContent=set.name;
+  $("ql-sub").textContent="Tap a question, write your answer, then read each other's.";
+  showApp("qlist");
+  $("ql-back").onclick=()=>openCategory("deep");
+  const {data:ans}=await sb.from("quiz_answers").select("quiz_id,user_id").eq("couple_id",state.couple.id);
+  const mine=new Set(),partner=new Set();
+  (ans||[]).forEach(a=>{ if(a.user_id===state.user.id)mine.add(a.quiz_id); else partner.add(a.quiz_id); });
+  $("ql-items").innerHTML=set.items.map(q=>{
+    const status=(mine.has(q.id)&&partner.has(q.id))?`<span style="color:#3E7A36;font-weight:600">shared ✓</span>`
+      :mine.has(q.id)?`<span class="muted">waiting…</span>`:`<span class="muted">your turn</span>`;
+    return `<div class="card pad" style="margin:10px 0;display:flex;justify-content:space-between;align-items:center;gap:12px;cursor:pointer" data-deep="${q.id}"><div style="font-weight:600">${q.prompt}</div><div style="font-size:.78rem;white-space:nowrap">${status}</div></div>`;
+  }).join("");
+  document.querySelectorAll("[data-deep]").forEach(el=>el.onclick=()=>openDeep(el.dataset.deep));
+}
 async function openDeep(qid){
   stopPoll();
   const q=QUIZZES.find(x=>x.id===qid); state.cur=q;
   showApp("quiz");
-  $("q-back").onclick=()=>{ stopPoll(); openCategory("deep"); };
+  $("q-back").onclick=()=>{ stopPoll(); openDeepSet(q.set); };
   const {data}=await sb.from("quiz_answers").select("user_id,choice").eq("couple_id",state.couple.id).eq("quiz_id",qid);
   const mine=(data||[]).find(a=>a.user_id===state.user.id), theirs=(data||[]).find(a=>a.user_id===state.partner.id);
   if(mine&&theirs) renderDeepReveal(q,mine.choice,theirs.choice);
@@ -711,8 +746,8 @@ function renderDeepReveal(q,mineTxt,theirsTxt){
     <div class="deepans" style="background:${colorFor(state.partner.id)}"><div class="who">${state.partner.display_name}</div>${escapeHtml(theirsTxt)}</div>
     <button class="btn ghost" style="margin-top:18px" id="rev-next">Next question →</button>`;
   $("rev-next").onclick=()=>{
-    const list=QUIZZES.filter(x=>x.cat==="deep"); const i=list.findIndex(x=>x.id===q.id);
-    if(i<list.length-1)openDeep(list[i+1].id); else { toast("That's the last one!"); openCategory("deep"); }
+    const list=SETS.deep[q.set].items; const i=list.findIndex(x=>x.id===q.id);
+    if(i<list.length-1)openDeep(list[i+1].id); else { toast("That's the last in this theme!"); openDeepSet(q.set); }
   };
 }
 function escapeHtml(s){ return (s||"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
@@ -777,11 +812,14 @@ function timeAgo(ts){ const s=(Date.now()-new Date(ts))/1000;
 /* ============================================================
    8. MEMORIES MAP
    ============================================================ */
-let map, markers=[], miniMap, miniMarker, pendingLatLng=null;
+let map, markers=[], miniMap, miniMarker, pendingLatLng=null, pendingPlace=null;
+const TILES="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png";
+const TILE_OPT={subdomains:"abcd",maxZoom:20,attribution:'&copy; OpenStreetMap &copy; CARTO'};
+function pinIcon(color){ return L.divIcon({className:"",html:`<div class="mappin" style="--c:${color}"></div>`,iconSize:[20,20],iconAnchor:[10,20],popupAnchor:[0,-18]}); }
 function openMapTab(){
   if(!map){
     map=L.map("map",{scrollWheelZoom:false}).setView([20,0],2);
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:19,attribution:"© OpenStreetMap"}).addTo(map);
+    L.tileLayer(TILES,TILE_OPT).addTo(map);
   }
   setTimeout(()=>map.invalidateSize(),120);
   loadMemories();
@@ -791,13 +829,12 @@ async function loadMemories(){
   const {data}=await sb.from("memories").select("*").eq("couple_id",state.couple.id).order("memory_date",{ascending:false});
   const list=$("mem-list");
   if(!data||!data.length){ list.innerHTML=`<div class="card pad center muted">No memories pinned yet — tap ＋ to add your first place.</div>`; return; }
-  const pts=[];
-  list.innerHTML="";
+  const pts=[]; list.innerHTML="";
   for(const m of data){
     if(m.lat&&m.lng){
-      const mk=L.marker([m.lat,m.lng]).addTo(map);
+      const mk=L.marker([m.lat,m.lng],{icon:pinIcon(colorFor(m.user_id))}).addTo(map);
       const url=m.image_path?await signed(m.image_path):"";
-      mk.bindPopup(`${url?`<img src="${url}" style="width:160px;border-radius:8px;display:block;margin-bottom:6px">`:""}<b>${m.title||m.place||"Memory"}</b><br><span style="color:#7C6F63">${m.memory_date?new Date(m.memory_date).toLocaleDateString():""}</span>`);
+      mk.bindPopup(`${url?`<img src="${url}" style="width:170px;border-radius:8px;display:block;margin-bottom:6px">`:""}<b>${m.title||m.place||"Memory"}</b><br><span style="color:#7C6F63;font-size:.8rem">${m.place?m.place+" · ":""}${m.memory_date?new Date(m.memory_date).toLocaleDateString():""}</span>`);
       markers.push(mk); pts.push([m.lat,m.lng]);
     }
     const thumb=m.image_path?await signed(m.image_path):"";
@@ -810,31 +847,56 @@ async function loadMemories(){
   if(pts.length) map.fitBounds(pts,{padding:[40,40],maxZoom:9});
 }
 $("mem-fab").onclick=()=>{
-  pendingLatLng=null;
+  pendingLatLng=null; pendingPlace=null;
   openModal(`<h2>Add a memory</h2>
+    <label class="fld">Title</label>
+    <input class="input" id="me-title" placeholder="e.g. First trip to Moganshan">
     <label class="fld">Photo (optional)</label>
     <input class="input" id="me-file" type="file" accept="image/*">
     <img class="thumb" id="me-thumb">
-    <label class="fld">Title</label>
-    <input class="input" id="me-title" placeholder="e.g. First trip to Moganshan">
-    <label class="fld">Place name (optional)</label>
-    <input class="input" id="me-place" placeholder="e.g. Moganshan, China">
     <label class="fld">Date</label>
     <input class="input" id="me-date" type="date">
-    <label class="fld">Where on the map? Tap to drop a pin</label>
+    <label class="fld">Where was it?</label>
+    <div style="display:flex;gap:8px;align-items:stretch">
+      <input class="input" id="me-search" placeholder="Search a place — e.g. Eiffel Tower" style="margin:6px 0;flex:1">
+      <button class="btn tiny" id="me-find" style="flex:none;margin:6px 0">Find</button>
+    </div>
+    <div id="me-results"></div>
     <button class="btn ghost tiny" id="me-loc" style="width:100%;margin:6px 0">📍 Use my current location</button>
+    <div id="me-picked" class="muted" style="font-size:.82rem;margin:2px 0;font-weight:600;color:var(--coral-d)"></div>
     <div id="mini-map"></div>
-    <div style="height:16px"></div><button class="btn" id="me-save">Save memory</button>`);
+    <div class="muted" style="font-size:.74rem;margin-top:5px">Tip: tap the map to nudge the pin exactly where you want it.</div>
+    <button class="btn" id="me-save" style="margin-top:14px">Save memory</button>`);
   $("me-file").onchange=e=>previewInto(e,"me-thumb");
   setTimeout(()=>{
     miniMap=L.map("mini-map").setView([20,0],2);
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:19}).addTo(miniMap);
-    miniMap.on("click",e=>setMini(e.latlng.lat,e.latlng.lng));
+    L.tileLayer(TILES,TILE_OPT).addTo(miniMap);
+    miniMap.on("click",e=>{ setMini(e.latlng.lat,e.latlng.lng); });
     miniMap.invalidateSize();
   },160);
+  const runSearch=async ()=>{
+    const q=$("me-search").value.trim(); if(!q) return;
+    $("me-results").innerHTML=`<div class="muted" style="font-size:.84rem;padding:4px 2px">Searching…</div>`;
+    try{
+      const r=await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=6&q=${encodeURIComponent(q)}`,{headers:{"Accept-Language":"en"}});
+      const list=await r.json();
+      if(!list.length){ $("me-results").innerHTML=`<div class="muted" style="font-size:.84rem">No matches — try another spelling, or tap the map.</div>`; return; }
+      window._geo=list;
+      $("me-results").innerHTML=list.map((p,i)=>`<div class="georow" data-i="${i}">${p.display_name}</div>`).join("");
+      document.querySelectorAll(".georow").forEach(el=>el.onclick=()=>{
+        const p=window._geo[el.dataset.i];
+        setMini(parseFloat(p.lat),parseFloat(p.lon)); miniMap.setView([p.lat,p.lon],12);
+        pendingPlace=p.display_name.split(",").slice(0,2).join(",").trim();
+        $("me-picked").textContent="📍 "+pendingPlace;
+        $("me-results").innerHTML="";
+      });
+    }catch(e){ $("me-results").innerHTML=`<div class="muted" style="font-size:.84rem">Search unavailable right now — tap the map to drop a pin.</div>`; }
+  };
+  $("me-find").onclick=runSearch;
+  $("me-search").addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); runSearch(); }});
   $("me-loc").onclick=()=>{
     if(!navigator.geolocation) return toast("Location not available");
-    navigator.geolocation.getCurrentPosition(p=>{ setMini(p.coords.latitude,p.coords.longitude); miniMap.setView([p.coords.latitude,p.coords.longitude],12); },()=>toast("Couldn't get location"));
+    navigator.geolocation.getCurrentPosition(p=>{ setMini(p.coords.latitude,p.coords.longitude); miniMap.setView([p.coords.latitude,p.coords.longitude],13); $("me-picked").textContent="📍 Your current spot"; },()=>toast("Couldn't get your location"));
   };
   $("me-save").onclick=async ()=>{
     const title=$("me-title").value.trim();
@@ -843,13 +905,13 @@ $("mem-fab").onclick=()=>{
     try{
       let path=null; const f=$("me-file").files[0]; if(f) path=await uploadPhoto(f);
       await sb.from("memories").insert({couple_id:state.couple.id,user_id:state.user.id,title,
-        place:$("me-place").value.trim()||null, memory_date:$("me-date").value||null,
+        place:pendingPlace||null, memory_date:$("me-date").value||null,
         image_path:path, lat:pendingLatLng?.lat||null, lng:pendingLatLng?.lng||null});
       closeModal(); loadMemories(); toast("Pinned 📍");
     }catch(err){ toast(err.message); $("me-save").disabled=false; $("me-save").textContent="Save memory"; }
   };
 };
-function setMini(lat,lng){ pendingLatLng={lat,lng}; if(miniMarker)miniMap.removeLayer(miniMarker); miniMarker=L.marker([lat,lng]).addTo(miniMap); }
+function setMini(lat,lng){ pendingLatLng={lat,lng}; if(miniMarker)miniMap.removeLayer(miniMarker); miniMarker=L.marker([lat,lng],{icon:pinIcon('var(--coral)')}).addTo(miniMap); }
 
 /* ============================================================
    9. BOOT
@@ -867,152 +929,183 @@ function setMini(lat,lng){ pendingLatLng={lat,lng}; if(miniMarker)miniMap.remove
 /* ============================================================
    10. QUIZ CONTENT  (~300 prompts)
    ============================================================ */
-function buildQuizzes(){
-  const WYR=[
-    ["Travel the world for a year","Own your dream home"],["Always be 10 min late","Always be 20 min early"],
-    ["A cozy night in","A night out dancing"],["Read minds","Be invisible"],["Beach holiday","Mountain cabin"],
-    ["Never use a phone again","Never watch TV again"],["Have more time","Have more money"],
-    ["Be famous","Be the smartest person alive"],["Live by the ocean","Live in a big city"],
-    ["Forehead in the sand vacation","Action-packed adventure trip"],["Breakfast for every meal","Dinner for every meal"],
-    ["Sing every word you speak","Dance everywhere you go"],["Relive your best memory","See your future once"],
-    ["Have a personal chef","Have a personal driver"],["Summer forever","Winter forever"],
-    ["Be able to fly","Be able to teleport"],["Lose all your photos","Lose all your messages"],
-    ["Camp under the stars","Five-star hotel"],["Coffee every morning","Tea every morning"],
-    ["Win the lottery","Find your perfect job"],["Speak every language","Play every instrument"],
-    ["Spicy food","Sweet food"],["A huge wedding","A tiny elopement"],["Sunrise person","Sunset person"],
-    ["Live in the past","Live in the future"],["A dog","A cat"],["Be a morning person","Be a night owl"],
-    ["Cook together","Order in together"],["Long road trip","Quick flight"],["Plan everything","Go with the flow"],
-    ["Give up coffee","Give up dessert"],["A quiet weekend","A packed weekend"],["Hike a mountain","Lie on a beach"],
-    ["Always know the truth","Always be blissfully unaware"],["Movie marathon","Game night"],
-    ["Live somewhere new every year","Stay in one place forever"],["Be 10 years younger","Be 10 years wiser"],
-    ["Surprise trip","Carefully planned trip"],["Texting","Calling"],["Front-row seats","Backstage passes"],
-    ["A garden","A pool"],["Snow day","Rainy day"],["Wake up early on weekends","Sleep in always"],
-    ["Have a twin","Be an only child"],["Endless books","Endless music"],["A treehouse","A houseboat"],
-    ["Travel to space","Explore the ocean floor"],["Be the best cook in town","Be the best dancer in town"],
-    ["Big family dinners","Quiet dinners for two"],["Live near the family","Live far and visit often"],
-    ["Time travel to the past","Time travel to the future"],["Pause time","Rewind time"],
-    ["Be a great writer","Be a great painter"],["Never feel cold","Never feel hot"],
-    ["Always have a clean house","Never do laundry again"],["Adventure date","Relaxing date"],
-    ["A picnic","A fancy restaurant"],["Be taller","Be faster"],["A surprise party","A quiet celebration"],
-    ["Visit every country","Master one place deeply"],["Karaoke night","Board-game night"],
-    ["Have one true talent","Be okay at everything"],["A vintage car","A brand-new car"],
-    ["Live in a cabin in the woods","Live in a loft downtown"],["A long bath","A quick shower"],
-    ["Be unforgettable","Be irreplaceable"],["Stargaze all night","Sleep early and rise with the sun"],
-    ["A spontaneous yes","A thoughtful maybe"],["Hold hands in public","Whisper inside jokes"],
-    ["Slow-dance in the kitchen","Watch the sunset in silence"],["Write each other letters","Leave each other voice notes"],
-    ["Build a life of routines","Build a life of surprises"],
-  ];
-  const NHIE=[
-    "stayed up all night talking","cried at a movie","sent a text to the wrong person","gone skinny dipping",
-    "fallen asleep in a public place","sung karaoke sober","forgotten an important birthday","road-tripped with no plan",
-    "kept a diary","been on TV","broken a bone","gotten a tattoo","pulled an all-nighter for fun","met someone famous",
-    "lied about my age","danced in the rain","gone a whole day without my phone","cooked a meal that totally failed",
-    "had a crush on a teacher","stolen a fry off your plate","re-gifted a present","faked being sick to skip something",
-    "gotten lost in a new city","stayed in bed all day","screamed on a roller coaster","binged a whole series in a day",
-    "gone camping","sent a risky text","laughed so hard I cried","missed a flight","tried to cut my own hair",
-    "kept a secret for years","talked my way out of a ticket","fallen for a prank","had stage fright",
-    "eaten something I shouldn't have","gone vegetarian for a while","run a race","written a love letter",
-    "made a wish on a shooting star","gone a month without spending money","ghosted someone","won a trophy",
-    "been the designated driver all night","cried happy tears","kept a childhood toy","slept under the stars",
-    "gotten a nickname I hated","performed on a stage","made a New Year's resolution I kept","tried to learn a TikTok dance",
-    "snooped through someone's playlist","saved a voicemail just to keep hearing it","planned a surprise that worked perfectly",
-    "rehearsed a conversation in the mirror","gotten butterflies before a date","reread old messages just to smile",
-    "memorized someone's coffee order","stayed on the phone until we both fell asleep",
-  ];
-  const WHO=[
-    "say I love you first","cry during a sad movie","plan the surprise","forget where they put their keys",
-    "win an argument","start a food fight","get lost without GPS","fall asleep first","apologize first",
-    "take the most photos","over-pack for a trip","sing in the shower","be late","make the other laugh hardest",
-    "spend too much online","cook dinner","do a spontaneous dance","remember the anniversary",
-    "talk to strangers","be the messy one","start a deep conversation at 2am","give the best gifts",
-    "survive a zombie apocalypse","steal the blanket at night","reply to texts the fastest",
-    "ask for directions","cry happy tears at a wedding","be the calm one in a crisis","pick the restaurant",
-    "win a dance-off","get distracted mid-task","plan the perfect date","be the first to say sorry",
-    "send good-morning texts","keep a secret","get emotional over a song","want dessert first",
-    "make the bed","forget a password","drive on the road trip","take the longest in the bathroom",
-    "make friends with the waiter","plan the whole vacation itinerary","be the one to say 'just five more minutes'",
-    "burn the toast","know everyone's birthdays","start humming a random song","cry at a commercial",
-    "be the first to wake up","leave the dishes for later","laugh at their own joke","pick the movie",
-    "say 'I'm not tired' then fall asleep","start the playlist","double-text","be the better navigator",
-    "remember tiny details","want to stay out later","initiate the cuddle","plan the next trip already",
-  ];
-  const TOT=[
-    ["Coffee","Tea"],["Mountains","Beach"],["Morning","Night"],["Sweet","Savory"],["Books","Movies"],
-    ["Cats","Dogs"],["Call","Text"],["City","Countryside"],["Spring","Autumn"],["Plan","Spontaneous"],
-    ["Window seat","Aisle seat"],["Pizza","Tacos"],["Quiet","Loud"],["Sunrise","Sunset"],["Cook","Order in"],
-    ["Adventure","Relaxation"],["Tidy","Cozy clutter"],["Early","Late"],["Hot","Cold"],["Music","Podcasts"],
-    ["Road trip","Flight"],["Save","Spend"],["Comedy","Drama"],["Tea in bed","Walk outside"],["Chocolate","Vanilla"],
-    ["Stay in","Go out"],["Big group","Just us"],["Fancy","Casual"],["Risk","Safe bet"],["Talk it out","Need space"],
-    ["Plant person","No plants"],["Snow","Rain"],["Surprise","Heads-up"],["Handwritten","Typed"],["Salty","Sweet"],
-    ["Dance","Sing"],["Beach read","Deep novel"],["New places","Favorite places"],["Phone call","Voice note"],
-    ["Brunch","Late dinner"],["Camping","Hotel"],["Window open","Window closed"],["Espresso","Latte"],
-    ["Slow morning","Productive morning"],["Sneakers","Boots"],["Mountains in summer","Mountains in winter"],
-    ["Picnic","Restaurant"],["Map it out","Wing it"],["Action","Rom-com"],["Tea ceremony","Quick cup"],
-    ["Lights on","Candlelight"],["Front seat","Back seat"],["Game night","Movie night"],["Sea","Lake"],
-    ["First date butterflies","Comfortable silence"],["Long letters","Quick check-ins"],["Stay up","Sleep in"],
-    ["Cook breakfast","Cook dinner"],["Walk","Drive"],["Slow song","Upbeat song"],
-  ];
-  const DEEP=[
-    {q:"What makes you feel most loved?",o:["Words","Quality time","Touch","Acts of help"]},
-    {q:"Your ideal weekend together is…",o:["Total rest","Exploring somewhere new","Seeing friends","A project together"]},
-    {q:"When you're stressed, you most want…",o:["Space to think","To talk it through","A distraction","A hug"]},
-    {q:"What matters most in five years?",o:["Adventure","Stability","Growth","Closeness"]},
-    {q:"Your love language for giving is…",o:["Words","Gifts","Time","Help"]},
-    {q:"After a hard day you crave…",o:["Quiet","Comfort food","A long talk","Sleep"]},
-    {q:"The best part of us is…",o:["How we laugh","How we talk","How we dream","How we're calm together"]},
-    {q:"You'd rather grow old…",o:["Traveling","In one cozy home","Surrounded by family","Trying new things"]},
-    {q:"What recharges you most?",o:["Alone time","Time with me","Time outdoors","Doing something creative"]},
-    {q:"A perfect anniversary looks like…",o:["A trip","A quiet night in","A new experience","Recreating a first date"]},
-    {q:"What scares you a little about the future?",o:["Distance","Routine","Change","Missing out"]},
-    {q:"The dream home is…",o:["By the sea","In the mountains","In the city","On the move"]},
-    {q:"You feel closest to me when…",o:["We're talking late","We're being silly","We're quiet together","We're working toward something"]},
-    {q:"What do you want more of in our days?",o:["Spontaneity","Calm","Adventure","深 conversations"]},
-    {q:"The kind of partner you want to be is…",o:["Supportive","Fun","Steady","Inspiring"]},
-    {q:"What's your idea of comfort?",o:["A warm meal","A familiar place","A long hug","A good talk"]},
-    {q:"When we disagree, you'd rather…",o:["Solve it now","Cool off first","Find the middle","Talk it all out"]},
-    {q:"What would make you proudest of us?",o:["Building something","Staying close","Helping others","Living fully"]},
-    {q:"A meaningful gift to you is…",o:["Something handmade","An experience","A heartfelt note","Time together"]},
-    {q:"You'd describe our energy as…",o:["Playful","Calm","Adventurous","Deep"]},
-    {q:"What helps you feel secure?",o:["Routine","Reassurance","Plans","Independence"]},
-    {q:"How do you most like to celebrate wins?",o:["Quietly","Big party","A special dinner","A getaway"]},
-    {q:"What's your favorite kind of morning?",o:["Slow and lazy","Early and active","Coffee and talk","Sleep till noon"]},
-    {q:"What do you value most day-to-day?",o:["Kindness","Honesty","Humor","Loyalty"]},
-    {q:"The future trip you most want is…",o:["A beach","A city","A mountain trek","A road trip"]},
-    {q:"You feel most yourself when…",o:["Creating","Resting","Exploring","Connecting"]},
-    {q:"What's the best way to apologize to you?",o:["Words","Time","A small act","A hug"]},
-    {q:"What does 'home' mean to you?",o:["A place","A person","A feeling","A routine"]},
-    {q:"What's your hope for us this year?",o:["More adventure","More calm","More closeness","More growth"]},
-    {q:"You'd rather be remembered for…",o:["Kindness","Achievements","Adventures","Love"]},
-    {q:"What's your comfort on a rainy day?",o:["A movie","A book","A nap","Cooking"]},
-    {q:"What do you most want to learn together?",o:["A language","To cook","An instrument","A sport"]},
-    {q:"Your ideal pace of life is…",o:["Fast and full","Slow and steady","Balanced","Seasonal"]},
-    {q:"What's the most romantic gesture to you?",o:["A surprise","A letter","Undivided attention","A shared ritual"]},
-    {q:"How do you handle big decisions?",o:["Lists and logic","Gut feeling","Talk it out","Sleep on it"]},
-    {q:"What makes a tradition special to you?",o:["Repetition","The people","The meaning","The surprise"]},
-    {q:"What's your favorite season of us so far?",o:["The beginning","Right now","Yet to come","Every part"]},
-    {q:"What do you need when you're sad?",o:["To be held","To be heard","To be distracted","To be alone a bit"]},
-    {q:"The best date is one that's…",o:["Adventurous","Relaxed","Romantic","Unexpected"]},
-    {q:"What's most important in a home together?",o:["Comfort","Style","Space","Location"]},
-    {q:"What kind of support do you value most?",o:["Encouragement","Practical help","Just listening","Honest advice"]},
-    {q:"What's your favorite way to reconnect after time apart?",o:["A long talk","A good meal","Just being close","A little adventure"]},
-    {q:"What would your perfect ordinary day include?",o:["A walk","A great meal","A long talk","A little nap"]},
-    {q:"What do you want our place to feel like?",o:["Cozy","Lively","Peaceful","Inspiring"]},
-    {q:"How do you like to show you care?",o:["Doing things","Saying things","Giving things","Being present"]},
-    {q:"What's the dream we should chase first?",o:["Travel","A home","A project","A family"]},
-    {q:"What keeps a relationship strong, to you?",o:["Communication","Trust","Fun","Patience"]},
-    {q:"What's your favorite small ritual of ours?",o:["Morning coffee","Goodnight texts","Weekend plans","Inside jokes"]},
-    {q:"When you imagine 'us, ten years on,' you feel…",o:["Excited","Peaceful","Curious","Grateful"]},
-    {q:"What's the best thing we make together?",o:["Memories","Laughter","Plans","A home"]},
-  ];
-  const out=[];
-  WYR.forEach((o,i)=>out.push({id:"wyr-"+i,cat:"wyr",prompt:"Would you rather…",options:o,sub:o.join(" or ")}));
-  // give WYR a readable prompt:
-  out.forEach(q=>{ if(q.cat==="wyr") q.prompt=q.options[0]+"  —or—  "+q.options[1]; });
-  NHIE.forEach((s,i)=>out.push({id:"nhie-"+i,cat:"nhie",prompt:"Never have I ever "+s,options:["I have 🙋","Never 🙅"]}));
-  WHO.forEach((s,i)=>out.push({id:"who-"+i,cat:"who",prompt:"Who's more likely to "+s+"?",options:[]}));
-  TOT.forEach((o,i)=>out.push({id:"tot-"+i,cat:"tot",prompt:o[0]+"  or  "+o[1]+"?",options:o}));
-  DEEP.forEach((d,i)=>out.push({id:"deep-"+i,cat:"deep",prompt:d.q,options:d.o}));
-  return out;
+function buildSets(){
+  // ---- helper for picture options: [label, loremflickr-keywords, emoji] ----
+  const SETDATA={
+    wyr:[
+      {name:"🧭 Wanderlust & Adventure", q:[
+        ["Backpack across Asia for 6 months","Buy a cottage and never leave"],
+        ["Spontaneous road trip with no destination","A perfectly planned dream itinerary"],
+        ["Live in a new city every year","Build deep roots in one place forever"],
+        ["Chase the northern lights in Iceland","Dive the Great Barrier Reef"],
+        ["Get gloriously lost together in a new city","Have every day perfectly mapped out"],
+        ["Sleep under the stars in the desert","Sleep in an overwater bungalow"],
+        ["Learn to surf together","Learn to ski together"],
+        ["A slow summer in Italy","A cozy winter in Japan"],
+        ["Travel first class but rarely","Travel economy but constantly"],
+        ["See all 7 wonders","Find 7 hidden spots no one knows"],
+      ]},
+      {name:"💸 Dreams, Money & Fame", q:[
+        ["Be famous for something you love","Be rich doing something you hate"],
+        ["Win the lottery tomorrow","Find your true calling"],
+        ["Unlimited money but no free time","Unlimited time but just enough money"],
+        ["Be the most talented in your field","Be the most loved"],
+        ["Retire at 35","Do work you adore until 75"],
+        ["Be remembered for 100 years","Be deeply loved by a few"],
+        ["A mansion where we rarely cross paths","A tiny home where we're always close"],
+        ["Achieve your biggest dream alone","A smaller dream together"],
+        ["Be world-famous as a couple","Be each other's best-kept secret"],
+        ["Never work again","Never feel bored again"],
+      ]},
+      {name:"🫀 Deep & Personal", q:[
+        ["Relive our favorite day","Get a perfect brand-new day"],
+        ["Always say exactly what you feel","Always know what I feel"],
+        ["Lose all our photos","Lose all our messages"],
+        ["Forget how we met","Forget our first kiss"],
+        ["Never argue but never grow","Argue sometimes and grow closer"],
+        ["Keep one secret forever","Know one of my secrets"],
+        ["Go back and change one thing","Leave everything exactly as it was"],
+        ["Be understood completely","Be loved unconditionally"],
+        ["Know every thought I have","Trust me completely without knowing"],
+        ["Have more time with me now","More time with me at the very end"],
+      ]},
+      {name:"🔥 A Little Spicy", q:[
+        ["A slow dance in the kitchen","A long kiss in the rain"],
+        ["A weekend in bed, no phones","A wild night out together"],
+        ["Whisper something daring","Leave me wondering"],
+        ["A handwritten love letter","A 2am confession call"],
+        ["Steal a kiss in public","Save it for when we're alone"],
+        ["A candlelit bath together","Sunrise tangled in the sheets"],
+        ["Tell me your fantasy","Make me guess it"],
+        ["A flirty text mid-meeting","A surprise waiting at home"],
+        ["Be teased all day","Be surprised all night"],
+        ["Get caught sneaking a kiss","Never get caught at all"],
+      ]},
+      {name:"🤪 Totally Unhinged", q:[
+        ["Fight 100 duck-sized horses","Fight 1 horse-sized duck"],
+        ["Fingers as long as your legs","Legs as long as your fingers"],
+        ["Sweat mayonnaise when nervous","Cry tiny ice cubes"],
+        ["Only speak in interpretive dance","Only speak in movie quotes"],
+        ["Sneeze glitter forever","Burp bubbles forever"],
+        ["A polka band follows you everywhere","Dramatic lightning on every entrance"],
+        ["Taste sounds","Hear colors"],
+        ["Spaghetti for hair (regrows daily)","Cheese-grater elbows"],
+        ["Bones replaced with wet noodles for a day","Blood replaced with hand sanitizer for a day"],
+        ["Be haunted by a friendly but loud ghost","Be followed by a confused goose with a grudge"],
+      ]},
+    ],
+    nhie:[
+      {name:"🌸 Sweet & Innocent", q:[
+        "kissed in the rain","stayed up all night talking","written someone a love letter",
+        "gotten butterflies over a text","danced with no music playing","fallen asleep on a call",
+        "made a playlist for someone","saved a voicemail just to hear a voice","planned a secret surprise",
+        "gotten nervous before a first date",
+      ]},
+      {name:"💭 Getting Personal", q:[
+        "re-read old messages and smiled","cried over a fictional couple","said 'I love you' a little too early",
+        "kept feelings hidden for months","rehearsed a conversation in the mirror","fallen for someone way too fast",
+        "compared a date to an ex","chickened out of confessing a crush","jealously deleted a photo",
+        "googled 'are we compatible'",
+      ]},
+      {name:"😈 Unhinged Confessions", q:[
+        "texted an ex at 3am","pretended to be on the phone to dodge someone","ghosted then un-ghosted",
+        "screenshotted a convo to over-analyze with friends","cried then immediately took a selfie",
+        "talked to my pet about my problems","named our future kids in my head already",
+        "practiced a toast for a 2-week-old relationship","stalked a tagged photo back three years",
+        "eaten something off the floor (5-second rule)",
+      ]},
+    ],
+    who:[
+      {name:"🌀 Everyday Chaos", q:[
+        "lose their phone while holding it","start a sentence then forget it","cry at a random commercial",
+        "burn water somehow","fall asleep mid-movie","start an argument about directions",
+        "leave 30 tabs open","forget why they walked into a room","overpack for one night away",
+        "panic-clean five minutes before guests",
+      ]},
+      {name:"💕 Romance Edition", q:[
+        "say I love you first","plan the big surprise","cry at our wedding","write the cheesy card",
+        "initiate the cuddle","get jealous first","remember the anniversary","send the goodnight text",
+        "tear up at 'our song'","get emotional over old photos",
+      ]},
+      {name:"🛸 Unhinged Edition", q:[
+        "accidentally start a cult","befriend a raccoon","get gently banned from a buffet",
+        "cry their way out of a ticket","text the whole story to the wrong group chat",
+        "adopt 7 cats on impulse","start beef with a Roomba","get way too invested in a stranger's drama",
+        "google symptoms and assume the worst","actually survive the apocalypse",
+      ]},
+    ],
+    tot:[
+      {name:"⚡ Quickfire Favorites", q:[
+        ["Coffee","Tea"],["Beach","Mountains"],["Morning","Night"],["Sweet","Savory"],["Cats","Dogs"],
+        ["Call","Text"],["City","Countryside"],["Stay in","Go out"],["Sunrise","Sunset"],["Plan","Wing it"],
+      ]},
+      {name:"🏠 Dream House", pic:true, q:[
+        {a:["Modern Mansion","modern,mansion","🏛️"], b:["Cozy Cabin","log,cabin","🪵"]},
+        {a:["Beach House","beach,house","🏖️"], b:["City Penthouse","penthouse,skyline","🌆"]},
+        {a:["Glass House in the Forest","glass,house","🌲"], b:["Stone Cottage","stone,cottage","🏡"]},
+        {a:["Loft Downtown","loft,apartment","🧱"], b:["Farmhouse","farmhouse","🌾"]},
+        {a:["Treehouse","treehouse","🌳"], b:["Houseboat","houseboat","⛵"]},
+        {a:["Tiny Home","tiny,house","📦"], b:["Sprawling Estate","luxury,estate","🏰"]},
+      ]},
+      {name:"✈️ Dream Vacation", pic:true, q:[
+        {a:["Maldives Overwater","maldives,beach","🏝️"], b:["Swiss Alps Chalet","alps,snow","🏔️"]},
+        {a:["Paris","paris,eiffel","🗼"], b:["Tokyo","tokyo,city","🏯"]},
+        {a:["Safari in Kenya","safari,africa","🦁"], b:["Mediterranean Cruise","cruise,ship","🚢"]},
+        {a:["Santorini","santorini,greece","🇬🇷"], b:["Bali","bali,beach","🌺"]},
+        {a:["Northern Lights, Iceland","iceland,aurora","🌌"], b:["Tropical Hawaii","hawaii,beach","🌴"]},
+        {a:["Roman Holiday","rome,colosseum","🏛️"], b:["Kyoto Temples","kyoto,temple","⛩️"]},
+      ]},
+    ],
+    deep:[
+      {name:"🔮 Us & The Future", q:[
+        "Where do you picture us in ten years?",
+        "What's a dream you haven't told me yet?",
+        "What does building a life together look like to you?",
+        "What's something you want us to do before we get old?",
+        "What kind of home do you want us to make one day?",
+        "What scares you a little about the future — and what excites you most?",
+      ]},
+      {name:"💞 Love & Vulnerability", q:[
+        "When do you feel most loved by me?",
+        "What's something you wish I understood about you?",
+        "When did you first know how you felt about me?",
+        "What's a fear you've never said out loud?",
+        "What does being forgiven feel like to you?",
+        "What do you need more of from me right now?",
+      ]},
+      {name:"🃏 Us, Unfiltered", q:[
+        "What's something you find oddly attractive about me?",
+        "What's a tiny thing I do that you secretly love?",
+        "What's the most ridiculous fight we could realistically have?",
+        "If we were a sitcom, what would it be called?",
+        "What inside joke still gets you every single time?",
+        "What's something you'd only ever admit to me?",
+      ]},
+    ],
+  };
+
+  function imgUrl(kw){ let h=0; for(let i=0;i<kw.length;i++)h=(h*31+kw.charCodeAt(i))>>>0; return "https://loremflickr.com/600/450/"+encodeURIComponent(kw)+"?lock="+(h%9000+100); }
+  const SETS={}, QUIZZES=[];
+  Object.keys(SETDATA).forEach(cat=>{
+    SETS[cat]=SETDATA[cat].map((set,si)=>{
+      const items=set.q.map((raw,qi)=>{
+        const id=cat+"-"+si+"-"+qi; let item={id,cat,set:si};
+        if(cat==="wyr"){ item.type="wyr"; item.options=raw; item.prompt=raw[0]+"  —or—  "+raw[1]; }
+        else if(cat==="nhie"){ item.type="nhie"; item.options=["I have 🙋","Never 🙅"]; item.prompt="Never have I ever "+raw; }
+        else if(cat==="who"){ item.type="who"; item.options=[]; item.prompt="Who's more likely to "+raw+"?"; }
+        else if(cat==="tot"){
+          if(set.pic){ item.type="pic"; item.options=[raw.a[0],raw.b[0]];
+            item.pics=[{label:raw.a[0],img:imgUrl(raw.a[1]),emoji:raw.a[2]},{label:raw.b[0],img:imgUrl(raw.b[1]),emoji:raw.b[2]}];
+            item.prompt=raw.a[0]+" or "+raw.b[0]+"?"; }
+          else { item.type="tot"; item.options=raw; item.prompt=raw[0]+"  or  "+raw[1]+"?"; }
+        }
+        else if(cat==="deep"){ item.type="deep"; item.prompt=raw; }
+        QUIZZES.push(item); return item;
+      });
+      return {name:set.name, pic:!!set.pic, cat, items};
+    });
+  });
+  return {SETS,QUIZZES};
 }
 </script>
 </body>
